@@ -108,12 +108,12 @@ RadixContainer<T> materialize_input(const std::shared_ptr<const Table>& in_table
 
     }
     if (DEBUG) {
-        for (auto& partition:radix_container) {
-            for (auto& element : partition.elements) {
-                std::cout << element.value << " ";
-            }
-            std::cout << std::endl;
-        }
+        // for (auto& partition:radix_container) {
+        //     for (auto& element : partition.elements) {
+        //         std::cout << element.value << " ";
+        //     }
+        //     std::cout << std::endl;
+        // }
     }
 
     return radix_container;

@@ -92,10 +92,12 @@ public:
         std::random_device rd;
         std::mt19937 gen(rd());
         std::uniform_int_distribution<> dis(static_cast<int>(_range_lower_bound), static_cast<int>(_range_upper_bound));
-        
+        // std::cout << static_cast<int>(_range_lower_bound) << " " << static_cast<int>(_range_upper_bound) << std::endl;
         _data.clear();
         for (size_t i = 0; i < num_rows; ++i) {
-            _data.emplace_back(dis(gen));
+            int val = dis(gen);
+            // if (val < 1) std::cout << "less than 1" << std::endl;
+            _data.emplace_back(val);
         }
         _null_values.resize(num_rows);
     }

@@ -8,8 +8,11 @@
 
 int main() {
 
-    size_t m = 100; // r_table_size
-    size_t n = 1000; // s_table_size
+    size_t pk_lower_bound = 1;
+    size_t pk_upper_bound = 200000;
+
+    size_t m = 159526; // r_table_size
+    size_t n = 6001215; // s_table_size
     size_t CHUNK_SIZE = 65536;
 
 
@@ -22,7 +25,7 @@ int main() {
     const auto& r_table = std::make_shared<Table>(r_column_defs, CHUNK_SIZE);
 
     std::vector<ColumnDefinition> s_column_defs = {
-        {int{}, false, 1, (float) m},
+        {int{}, false, (float) pk_lower_bound, (float) pk_upper_bound},
         {int{}, false, 1, 50},
         {float{}, false, 900.0, 9000.0},
         {float{}, false, 0.01, 0.10},
