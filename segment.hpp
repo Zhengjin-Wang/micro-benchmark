@@ -9,6 +9,7 @@
 
 // 支持的基础数据类型
 using DataType = std::variant<int, float, std::string>;
+using ChunkOffset = int32_t;
 
 // 列定义（名称 + 类型）
 struct ColumnDefinition {
@@ -19,6 +20,34 @@ struct ColumnDefinition {
     float range_upper_bound; // only valid for int and float, invalid for pk and string
 };
 
+
+class SegmentPosition final {
+public:
+    SegmentPosition()
+    : _value(DataType()), _null_value(false), _chunk_offset() {}
+
+    SegmentPosition(const DataType& value, const bool null_value, const ChunkOffset& chunk_offset)
+        : _value{value}, _null_value{null_value}, _chunk_offset{chunk_offset} {}
+
+    const DataType& value() const {
+        return _value;
+    }
+
+    bool is_null() const {
+        return _null_value;
+    }
+
+    ChunkOffset chunk_offset() const {
+        return _chunk_offset;
+    }
+
+private:
+    // The alignment improves the suitability of the iterator for (auto-)vectorization
+    alignas(8) DataType _value;
+    alignas(8) bool _null_value;
+    alignas(8) ChunkOffset _chunk_offset;
+};
+
 // 段（Segment）基类 - 代表单列数据存储
 class BaseSegment {
 public:
@@ -26,15 +55,24 @@ public:
     _is_pk(is_pk), _range_lower_bound(range_lower_bound), _range_upper_bound(range_upper_bound){};
     virtual ~BaseSegment() = default;
     virtual void generate_random(size_t num_rows) = 0; // 随机生成数据
-    virtual const std::vector<DataType>& data() const = 0;
     bool is_pk() const { return _is_pk; }
 
     static std::shared_ptr<BaseSegment> create_segment(const DataType& type, bool is_pk, float range_lower_bound, float range_upper_bound);
+
+    const SegmentPosition at(int32_t i) const {
+        return {_data[i], _null_values[i], i};
+    }
+
+    const std::vector<DataType>& data() const {
+        return _data;
+    }
 
 protected:
     bool _is_pk;
     float _range_lower_bound;
     float _range_upper_bound;
+    std::vector<DataType> _data;
+    std::vector<bool> _null_values;
 };
 
 // 具体段类型
@@ -47,6 +85,7 @@ public:
         for (int i = (int) start_offset; i <= (int) (start_offset + num_rows - 1); ++i) {
             _data.emplace_back(i);
         }
+        _null_values.resize(num_rows);
     }
 
     void generate_random(size_t num_rows) override {
@@ -58,18 +97,13 @@ public:
         for (size_t i = 0; i < num_rows; ++i) {
             _data.emplace_back(dis(gen));
         }
+        _null_values.resize(num_rows);
     }
 
     int at(size_t i) const {
         return std::get<int>(data()[i]);
     }
 
-    const std::vector<DataType>& data() const override {
-        return _data;
-    }
-
-private:
-    std::vector<DataType> _data;
 };
 
 // 浮点数段
@@ -86,18 +120,14 @@ public:
         for (size_t i = 0; i < num_rows; ++i) {
             _data.emplace_back(dis(gen)); // 存储为 float 类型
         }
+        _null_values.resize(num_rows);
     }
 
     float at(size_t i) const {
         return std::get<float>(data()[i]);
     }
 
-    const std::vector<DataType>& data() const override { 
-        return _data; 
-    }
 
-private:
-    std::vector<DataType> _data; // 必须定义数据存储
 };
 
 
@@ -120,18 +150,14 @@ public:
             }
             _data.emplace_back(str); // 存储为 string 类型
         }
+        _null_values.resize(num_rows);
     }
 
     std::string at(size_t i) const {
         return std::get<std::string>(data()[i]);
     }
 
-    const std::vector<DataType>& data() const override { 
-        return _data; 
-    }
-
 private:
-    std::vector<DataType> _data; // 必须定义数据存储
     std::mt19937 _gen{std::random_device{}()};
 };
 

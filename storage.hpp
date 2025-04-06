@@ -1,3 +1,9 @@
+//
+// Created by lilac on 25-4-6.
+//
+
+#ifndef STORAGE_HPP
+#define STORAGE_HPP
 #pragma once
 
 #include <vector>
@@ -21,6 +27,7 @@ public:
 
     // 生成该块的所有列数据
     void generate_data(size_t num_rows, size_t start_offset = 1) {
+        _row_count = num_rows;
         for (auto& seg : _segments) {
             if (seg->is_pk()) std::dynamic_pointer_cast<IntSegment>(seg)->generate_pk(num_rows, start_offset);
             else seg->generate_random(num_rows);
@@ -31,12 +38,16 @@ public:
         return _segments[column_id];
     }
 
-    const std::vector<std::shared_ptr<BaseSegment>>& segments() const { 
-        return _segments; 
+    const std::vector<std::shared_ptr<BaseSegment>>& segments() const {
+        return _segments;
+    }
+
+    size_t row_count() const {
+        return _row_count;
     }
 
 private:
-
+    size_t _row_count;
     std::vector<std::shared_ptr<BaseSegment>> _segments;
 };
 
@@ -48,6 +59,7 @@ public:
 
     // 生成指定行数的数据
     void generate_data(size_t total_rows) {
+        _row_count = total_rows;
         size_t remaining = total_rows;
         size_t start_index = 1;
         while (remaining > 0) {
@@ -60,12 +72,26 @@ public:
         }
     }
 
-    const std::vector<std::shared_ptr<Chunk>>& chunks() const { 
-        return _chunks; 
+    size_t row_count() const {
+        return _row_count;
+    }
+
+    size_t chunk_count() const {
+        return _chunks.size();
+    }
+
+    std::shared_ptr<Chunk> get_chunk(size_t i) const {
+        return _chunks[i];
+    }
+
+    const std::vector<std::shared_ptr<Chunk>>& chunks() const {
+        return _chunks;
     }
 
 private:
     std::vector<ColumnDefinition> _column_defs;    // column_defs：不同列的数据类型
     std::vector<std::shared_ptr<Chunk>> _chunks;
     size_t _chunk_size;    // 每个chunk的行数
+    size_t _row_count;
 };
+#endif //STORAGE_HPP

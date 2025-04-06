@@ -1,7 +1,9 @@
 #include <vector>
 #include <iostream>
 #include <memory>
-#include "simulator_storage.hpp"
+
+#include "join_hash.hpp"
+#include "storage.hpp"
 #include "segment.hpp"
 
 int main() {
@@ -17,7 +19,7 @@ int main() {
         {int{}, false, 1, 100},
         {std::string{}, false, 0, 0}
     };
-    Table r_table(r_column_defs, CHUNK_SIZE);
+    const auto& r_table = std::make_shared<Table>(r_column_defs, CHUNK_SIZE);
 
     std::vector<ColumnDefinition> s_column_defs = {
         {int{}, false, 1, (float) m},
@@ -27,27 +29,29 @@ int main() {
         {float{}, false, 0.01, 0.10},
         {int{}, false, 1, 7}
     };
-    Table s_table(s_column_defs, CHUNK_SIZE);
+    const auto& s_table = std::make_shared<Table>(s_column_defs, CHUNK_SIZE);
 
-    r_table.generate_data(m); // 生成m行数据
-    s_table.generate_data(n); // 生成n行数据
+    r_table->generate_data(m); // 生成m行数据
+    s_table->generate_data(n); // 生成n行数据
+    std::pair<ColumnID, ColumnID> column_ids({0, 0});
+    join_hash<int, int, int>(r_table, s_table, column_ids, 10);
 
     // 打印数据
-    const auto& r_chunk = r_table.chunks()[0];
-    const auto& r_segment =    std::dynamic_pointer_cast<IntSegment>(r_chunk->get_segment(0));
+    // const auto& r_chunk = r_table.chunks()[0];
+    // const auto& r_segment =    std::dynamic_pointer_cast<IntSegment>(r_chunk->get_segment(0));
+    //
+    // const auto& s_chunk = s_table.chunks()[0];
+    // const auto& s_segment =    std::dynamic_pointer_cast<IntSegment>(s_chunk->get_segment(0));
 
-    const auto& s_chunk = s_table.chunks()[0];
-    const auto& s_segment =    std::dynamic_pointer_cast<IntSegment>(s_chunk->get_segment(0));
-
-    for (size_t i = 0; i < m; ++i) {
-        int id = r_segment->at(i);
-        std::cout << "r-id: " << id << std::endl;
-    }
-
-    for (size_t i = 0; i < n; ++i) {
-        int id = s_segment->at(i);
-        std::cout << "s-id: " << id << std::endl;
-    }
+    // for (size_t i = 0; i < m; ++i) {
+    //     int id = r_segment->at(i);
+    //     std::cout << "r-id: " << id << std::endl;
+    // }
+    //
+    // for (size_t i = 0; i < n; ++i) {
+    //     int id = s_segment->at(i);
+    //     std::cout << "s-id: " << id << std::endl;
+    // }
 
     return 0;
 }
