@@ -10,7 +10,6 @@
 #include <random>
 
 #include "segment.hpp"
-
 using ColumnID = uint16_t;
 
 // 块（Chunk）- 包含多个段（列）
@@ -96,7 +95,7 @@ public:
                     auto segment = chunk->get_segment(column_id);
                     auto& type = _column_defs[column_id].type;
                     if (std::holds_alternative<int>(type)) {
-                        s += std::to_string(std::get<int>(segment->data()[i]));
+                        s += std::to_string(std::dynamic_pointer_cast<IntSegment>(segment)->_data[i]);
                     }
                     else if (std::holds_alternative<float>(type)) {
                         s += std::to_string(std::get<float>(segment->data()[i]));

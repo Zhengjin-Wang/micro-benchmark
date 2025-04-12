@@ -7,14 +7,14 @@
 #include "src/storage/storage.hpp"
 #include "src/storage/segment.hpp"
 
-#define OUTPUT_DATA 0
+#define OUTPUT_DATA 1
 
 int main() {
 
-    size_t m = 309526; // r_table_size
-    size_t n = 12001215; // s_table_size
+    size_t m = 159526; // r_table_size
+    size_t n = 6001215; // s_table_size
     size_t pk_lower_bound = 1;
-    size_t pk_upper_bound = 400000;
+    size_t pk_upper_bound = 2000000;
     size_t CHUNK_SIZE = 65536;
 
 

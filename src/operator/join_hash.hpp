@@ -9,6 +9,8 @@
 #include "../storage/storage.hpp"
 #define DEBUG 1
 
+// #define BOOST_BITSET
+
 class RowID {
 public:
     RowID() = default;
@@ -40,15 +42,23 @@ static constexpr auto BLOOM_FILTER_SIZE = 1 << 20;
 static constexpr auto BLOOM_FILTER_MASK = BLOOM_FILTER_SIZE - 1;
 using Hash = size_t;
 
+#ifndef BOOST_BITSET
 using BloomFilter = std::bitset<BLOOM_FILTER_SIZE>;
-
 static const auto ALL_TRUE_BLOOM_FILTER = BloomFilter{}.set();
+#else
+#include <boost/dynamic_bitset.hpp>
+using BloomFilter = boost::dynamic_bitset<>;
+static const auto ALL_TRUE_BLOOM_FILTER = ~BloomFilter(BLOOM_FILTER_SIZE);
+#endif
 
 template <typename T, typename HashedType>
 RadixContainer<T> materialize_input(const std::shared_ptr<const Table>& in_table, const ColumnID column_id,
                                     std::vector<std::vector<size_t>>& histograms, const size_t radix_bits,
                                     BloomFilter& output_bloom_filter,
                                     const BloomFilter& input_bloom_filter) {
+#ifdef BOOST_BITSET
+    output_bloom_filter.resize(BLOOM_FILTER_SIZE);
+#endif
     const auto start = std::chrono::high_resolution_clock::now();
     const auto chunk_count = in_table->chunk_count();
 
@@ -69,7 +79,9 @@ RadixContainer<T> materialize_input(const std::shared_ptr<const Table>& in_table
     // copy memory
     for (int32_t chunk_id = 0; chunk_id < chunk_count; ++chunk_id){
         auto chunk_in = in_table->get_chunk(chunk_id);
-        auto segment = chunk_in->get_segment(column_id);
+        auto base_segment = chunk_in->get_segment(column_id);
+        auto segment = std::dynamic_pointer_cast<IntSegment>(base_segment);
+        // auto segment = base_segment;
         const auto num_rows = chunk_in->row_count();
 
         auto& elements = radix_container[chunk_id].elements;
@@ -82,9 +94,10 @@ RadixContainer<T> materialize_input(const std::shared_ptr<const Table>& in_table
 
         auto histogram = std::vector<size_t>(num_radix_partitions);
 
-        for (size_t i = 0; i < num_rows; ++i) {
+        for (int32_t i = 0; i < num_rows; ++i) {
             auto& value = segment->at(i);
-            auto& actual_value = std::get<T>(value.value());
+            auto& actual_value = value.value();
+            // auto& actual_value = std::get<T>(value.value());
             const auto hashed_value = hash_function(static_cast<HashedType>(actual_value));
             auto skip = false;
             if (!value.is_null() && !input_bloom_filter[hashed_value & BLOOM_FILTER_MASK]) {

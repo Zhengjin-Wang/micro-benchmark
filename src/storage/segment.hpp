@@ -25,6 +25,34 @@ struct ColumnDefinition {
 };
 
 
+class IntSegmentPosition final {
+public:
+    IntSegmentPosition()
+    : _value(0), _null_value(false), _chunk_offset() {}
+
+    IntSegmentPosition(const int& value, const bool null_value, const ChunkOffset& chunk_offset)
+        : _value{value}, _null_value{null_value}, _chunk_offset{chunk_offset} {}
+
+    const int& value() const {
+        return _value;
+    }
+
+    bool is_null() const {
+        return _null_value;
+    }
+
+    ChunkOffset chunk_offset() const {
+        return _chunk_offset;
+    }
+
+private:
+    // The alignment improves the suitability of the iterator for (auto-)vectorization
+    alignas(8) int _value;
+    alignas(8) bool _null_value;
+    alignas(8) ChunkOffset _chunk_offset;
+};
+
+
 class SegmentPosition final {
 public:
     SegmentPosition()
@@ -94,7 +122,7 @@ public:
 
     void generate_random(size_t num_rows) override {
         std::random_device rd;
-        std::mt19937 gen(rd());
+        std::mt19937 gen(1);
         std::uniform_int_distribution<> dis(static_cast<int>(_range_lower_bound), static_cast<int>(_range_upper_bound));
         // std::cout << static_cast<int>(_range_lower_bound) << " " << static_cast<int>(_range_upper_bound) << std::endl;
         _data.clear();
@@ -102,13 +130,16 @@ public:
             int val = dis(gen);
             // if (val < 1) std::cout << "less than 1" << std::endl;
             _data.emplace_back(val);
+            BaseSegment::_data.emplace_back(val);
         }
         _null_values.resize(num_rows);
     }
 
-    int at(size_t i) const {
-        return std::get<int>(data()[i]);
+    const IntSegmentPosition at(int32_t i) const {
+        return {_data[i], _null_values[i], i};
     }
+
+    std::vector<int> _data;
 
 };
 
