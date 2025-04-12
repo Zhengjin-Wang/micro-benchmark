@@ -11,10 +11,11 @@
 
 int main() {
 
-    size_t m = 309526; // r_table_size
-    size_t n = 12001215; // s_table_size
+    size_t sf = 1;
+    size_t m = 159526 * sf; // r_table_size
+    size_t n = 6001215 * sf; // s_table_size
     size_t pk_lower_bound = 1;
-    size_t pk_upper_bound = 400000;
+    size_t pk_upper_bound = 200000 * sf;
     size_t CHUNK_SIZE = 65536;
 
 
