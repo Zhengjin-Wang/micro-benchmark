@@ -7,11 +7,15 @@
 #include "src/storage/storage.hpp"
 #include "src/storage/segment.hpp"
 
-#define OUTPUT_DATA 0
+#define OUTPUT_DATA 1
 
-int main() {
+int main(int argc, char** argv) {
 
     int sf = 1;
+    if(argc > 1){
+        sf = atoi(argv[1]);
+    }
+    std::cout << "sf=" << sf << std::endl;
     size_t m = 159526 * sf; // r_table_size
     size_t n = 6001215 * sf; // s_table_size
     size_t pk_lower_bound = 1;
