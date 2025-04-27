@@ -11,14 +11,17 @@
 
 #include "segment.hpp"
 using ColumnID = uint16_t;
+using ChunkID = uint32_t;
+
+#define CHUNK_SIZE 65536
 
 // 块（Chunk）- 包含多个段（列）
 class Chunk {
 public:
     // column_defs：存储对应列的数据类型
-    Chunk(const std::vector<ColumnDefinition>& column_defs) {
+    Chunk(const std::vector<ColumnDefinition>& column_defs, int32_t num_rows = 0) {
         for (const auto& def : column_defs) {
-            _segments.emplace_back(BaseSegment::create_segment(def.type, def.is_pk, def.range_lower_bound, def.range_upper_bound));
+            _segments.emplace_back(BaseSegment::create_segment(def.type, def.is_pk, def.range_lower_bound, def.range_upper_bound, num_rows));
         }
     }
 
@@ -85,6 +88,18 @@ public:
         return _chunks;
     }
 
+    void append_mutable_chunk() {
+        auto chunk = std::make_shared<Chunk>(_column_defs, CHUNK_SIZE);
+
+        // auto mvcc_data = std::shared_ptr<MvccData>{};
+        // if (_use_mvcc == UseMvcc::Yes) {
+        //     mvcc_data = std::make_shared<MvccData>(_target_chunk_size, MvccData::MAX_COMMIT_ID);
+        // }
+
+        // append_chunk(segments, mvcc_data);
+        _chunks.push_back(chunk);
+    }
+
     void output_data(const std::string& filepath, const std::vector<ColumnID>& column_ids) {
         std::ofstream out_file(filepath);
         for (auto& chunk : _chunks) {
@@ -98,10 +113,10 @@ public:
                         s += std::to_string(std::dynamic_pointer_cast<IntSegment>(segment)->_data[i]);
                     }
                     else if (std::holds_alternative<float>(type)) {
-                        s += std::to_string(std::get<float>(segment->data()[i]));
+                        s += std::to_string(std::dynamic_pointer_cast<FloatSegment>(segment)->_data[i]);
                     }
                     else if (std::holds_alternative<std::string>(type)) {
-                        s += std::get<std::string>(segment->data()[i]);
+                        s += std::dynamic_pointer_cast<StringSegment>(segment)->_data[i];
                     }
                     if (column_id != column_ids.back()) {
                         s += ",";
@@ -115,10 +130,15 @@ public:
         std::cout << "Successfully saved table to " << filepath << std::endl;
     }
 
+    std::unique_lock<std::mutex> Table::acquire_append_mutex() {
+        return std::unique_lock<std::mutex>(*_append_mutex);
+    }
+
 private:
     std::vector<ColumnDefinition> _column_defs;    // column_defs：不同列的数据类型
     std::vector<std::shared_ptr<Chunk>> _chunks;
     size_t _chunk_size;    // 每个chunk的行数
     size_t _row_count;
+    std::unique_ptr<std::mutex> _append_mutex;
 };
 #endif //STORAGE_HPP
