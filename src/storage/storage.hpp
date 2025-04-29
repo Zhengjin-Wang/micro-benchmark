@@ -32,7 +32,7 @@ public:
         }
     }
 
-    std::shared_ptr<BaseSegment> get_segment(ColumnID column_id) {
+    std::shared_ptr<BaseSegment> get_segment(ColumnID column_id) const {
         return _segments[column_id];
     }
 
@@ -44,9 +44,18 @@ public:
         return _row_count;
     }
 
+    ChunkOffset size() const {
+        if (_segments.empty()) {
+            return ChunkOffset{0};
+        }
+        const auto first_segment = this->get_segment(ColumnID{0});
+        return static_cast<ChunkOffset>(first_segment->size());
+    }
+
 private:
     size_t _row_count;
     std::vector<std::shared_ptr<BaseSegment>> _segments;
+    std::atomic_bool _is_mutable{true};
 };
 
 // 表（Table）- 包含多个块

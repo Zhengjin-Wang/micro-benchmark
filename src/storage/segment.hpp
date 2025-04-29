@@ -97,6 +97,7 @@ public:
     // const std::vector<DataType>& data() const {
     //     return _data;
     // }
+    virtual ChunkOffset size() const = 0;
 
 protected:
     bool _is_pk;
@@ -147,6 +148,10 @@ public:
         _null_values.resize(num_rows);
     }
 
+    ChunkOffset size() const override {
+        return _data.size();
+    }
+
     std::vector<int> _data;
 
 };
@@ -180,6 +185,10 @@ public:
     void resize(int32_t num_rows) {
         _data.resize(num_rows);
         _null_values.resize(num_rows);
+    }
+
+    ChunkOffset size() const override {
+        return _data.size();
     }
 
     std::vector<float> _data;
@@ -220,6 +229,10 @@ public:
     void resize(int32_t num_rows) {
         _data.resize(num_rows);
         _null_values.resize(num_rows);
+    }
+
+    ChunkOffset size() const override {
+        return _data.size();
     }
 
     std::vector<std::string> _data;

@@ -67,5 +67,4 @@ struct MvccData {
 std::ostream& operator<<(std::ostream& stream, const MvccData& mvcc_data);
 
 
-
 #endif //MVCC_DATA_H
