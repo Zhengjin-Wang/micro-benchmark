@@ -20,7 +20,7 @@ int main(int argc, char** argv) {
     size_t n = 6001215 * sf; // s_table_size
     size_t pk_lower_bound = 1;
     size_t pk_upper_bound = 200000 * sf;
-    size_t CHUNK_SIZE = 65536;
+    // size_t CHUNK_SIZE = 65536;
 
 
     // 定义表结构：三列（int, float, string）
@@ -53,11 +53,16 @@ int main(int argc, char** argv) {
     }
     std::pair<ColumnID, ColumnID> column_ids({0, 0});
 
+    // 测试join_hash
     start = std::chrono::high_resolution_clock::now();
     join_hash<int, int, int>(r_table, s_table, column_ids, 10);
     end = std::chrono::high_resolution_clock::now();
     duration = std::chrono::duration<double>(end - start).count();
     std::cerr << "hash_join time: " << duration << "s" << std::endl;
+
+
+
+
     // 打印数据
     // const auto& r_chunk = r_table.chunks()[0];
     // const auto& r_segment =    std::dynamic_pointer_cast<IntSegment>(r_chunk->get_segment(0));

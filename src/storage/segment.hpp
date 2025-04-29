@@ -9,11 +9,10 @@
 #include <vector>
 #include <random>
 #include <memory>
+#include "../types.hpp"
 
 
 // 支持的基础数据类型
-using DataType = std::variant<int, float, std::string>;
-using ChunkOffset = int32_t;
 
 // 列定义（名称 + 类型）
 struct ColumnDefinition {

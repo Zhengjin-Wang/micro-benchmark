@@ -7,11 +7,9 @@
 #include <vector>
 #include <memory>
 #include <variant>
-#include <random>
 
 #include "segment.hpp"
-using ColumnID = uint16_t;
-using ChunkID = uint32_t;
+#include "../types.hpp"
 
 #define CHUNK_SIZE 65536
 
@@ -130,7 +128,7 @@ public:
         std::cout << "Successfully saved table to " << filepath << std::endl;
     }
 
-    std::unique_lock<std::mutex> Table::acquire_append_mutex() {
+    std::unique_lock<std::mutex> acquire_append_mutex() {
         return std::unique_lock<std::mutex>(*_append_mutex);
     }
 
