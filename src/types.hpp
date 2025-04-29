@@ -11,4 +11,7 @@ using ChunkID = uint32_t;
 
 using CommitID = uint32_t;
 using TransactionID = uint32_t;
+
+constexpr auto INVALID_TRANSACTION_ID = TransactionID{0};
+constexpr auto INITIAL_TRANSACTION_ID = TransactionID{1};
 #endif //TYPES_HPP
