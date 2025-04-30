@@ -8,8 +8,10 @@
 #include <memory>
 #include <variant>
 
+#include "mvcc_data.h"
 #include "segment.hpp"
 #include "../types.hpp"
+#include "../assert.h"
 
 #define CHUNK_SIZE 65536
 
@@ -50,6 +52,29 @@ public:
         }
         const auto first_segment = this->get_segment(ColumnID{0});
         return static_cast<ChunkOffset>(first_segment->size());
+    }
+
+    bool is_mutable() const {
+        return _is_mutable.load();
+    }
+
+    void set_immutable() {
+        auto success = true;
+        Assert(_is_mutable.compare_exchange_strong(success, false), "Only mutable chunks can be set immutable.");
+
+        // Only perform the `max_begin_cid` check if it has not already been set.
+        if (has_mvcc_data() && _mvcc_data->max_begin_cid.load() == MvccData::MAX_COMMIT_ID) {
+            const auto chunk_size = size();
+            Assert(chunk_size > 0, "`set_immutable()` should not be called on an empty chunk.");
+            auto max_begin_cid = CommitID{0};
+            for (auto chunk_offset = ChunkOffset{0}; chunk_offset < chunk_size; ++chunk_offset) {
+                max_begin_cid = std::max(max_begin_cid, _mvcc_data->get_begin_cid(chunk_offset));
+            }
+            set_atomic_max(_mvcc_data->max_begin_cid, max_begin_cid);
+
+            Assert(_mvcc_data->max_begin_cid != MvccData::MAX_COMMIT_ID,
+                   "`max_begin_cid` should not be MAX_COMMIT_ID when marking a chunk as immutable.");
+        }
     }
 
 private:
