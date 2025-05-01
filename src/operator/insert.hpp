@@ -7,8 +7,19 @@
 #include <bits/stdc++.h>
 #include "../storage/segment.hpp"
 #include "../storage/storage.hpp"
+#include "../concurrency/transaction_manager.hpp"
+
+// Ranges of rows to which the inserted values are written.
+struct ChunkRange {
+  ChunkID chunk_id{};
+  ChunkOffset begin_chunk_offset{};
+  ChunkOffset end_chunk_offset{};
+};
+
 
 std::shared_ptr<const Table> insert(std::shared_ptr<Table> _target_table, std::vector<int>& values_to_insert) {
+  std::vector<ChunkRange> _target_chunk_ranges;
+
   // stage 1
   {
     const auto append_lock = _target_table->acquire_append_mutex();
@@ -32,7 +43,6 @@ std::shared_ptr<const Table> insert(std::shared_ptr<Table> _target_table, std::v
 
       // Register that Insert is pending. See `chunk.hpp`. for details.
       const auto& mvcc_data = target_chunk->mvcc_data();
-      DebugAssert(mvcc_data, "Insert cannot operate on a table without MVCC data.");
       mvcc_data->register_insert();
 
       const auto num_rows_for_target_chunk =
@@ -45,11 +55,11 @@ std::shared_ptr<const Table> insert(std::shared_ptr<Table> _target_table, std::v
       // Mark new (but still empty) rows as being under modification by current transaction. Do so before resizing the
       // Segments, because the resize of `Chunk::_segments.front()` is what releases the new row count.
       {
-        const auto transaction_id = context->transaction_id();
+        const auto transaction_id = TransactionManager::get_next_transaction_id();
         const auto end_offset = target_chunk->size() + num_rows_for_target_chunk;
         for (auto target_chunk_offset = target_chunk->size(); target_chunk_offset < end_offset; ++target_chunk_offset) {
-          DebugAssert(mvcc_data->get_begin_cid(target_chunk_offset) == MvccData::MAX_COMMIT_ID, "Invalid begin CID.");
-          DebugAssert(mvcc_data->get_end_cid(target_chunk_offset) == MvccData::MAX_COMMIT_ID, "Invalid end CID.");
+//          DebugAssert(mvcc_data->get_begin_cid(target_chunk_offset) == MvccData::MAX_COMMIT_ID, "Invalid begin CID.");
+//          DebugAssert(mvcc_data->get_end_cid(target_chunk_offset) == MvccData::MAX_COMMIT_ID, "Invalid end CID.");
           mvcc_data->set_tid(target_chunk_offset, transaction_id, std::memory_order_relaxed);
         }
       }

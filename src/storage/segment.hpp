@@ -120,8 +120,8 @@ public:
     void generate_pk(size_t num_rows, size_t start_offset = 1) {
         _data.clear();
         resize(num_rows);
-        for (int i = (int) start_offset; i <= (int) (start_offset + num_rows - 1); ++i) {
-            _data[i] = i;
+        for (int i = 0; i < num_rows; ++i) {
+            _data[i] = i + start_offset;
         }
     }
 

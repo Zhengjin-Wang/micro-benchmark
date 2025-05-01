@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
         {int{}, false, 1, 100},
         {std::string{}, false, 0, 0}
     };
-    const auto& r_table = std::make_shared<Table>(r_column_defs, CHUNK_SIZE);
+    const auto& r_table = std::make_shared<Table>(r_column_defs);
 
     std::vector<ColumnDefinition> s_column_defs = {
         {int{}, false, (float) pk_lower_bound, (float) pk_upper_bound},
@@ -39,7 +39,7 @@ int main(int argc, char** argv) {
         {float{}, false, 0.01, 0.10},
         {int{}, false, 1, 7}
     };
-    const auto& s_table = std::make_shared<Table>(s_column_defs, CHUNK_SIZE);
+    const auto& s_table = std::make_shared<Table>(s_column_defs);
 
     auto start = std::chrono::high_resolution_clock::now();
     r_table->generate_data(m); // 生成m行数据

@@ -8,7 +8,7 @@
 #include <iosfwd>
 #include <vector>
 
-#include "../utils/copyable_atomic.h"
+#include "../utils/copyable_atomic.hpp"
 #include "../types.hpp"
 
 struct MvccData {

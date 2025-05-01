@@ -8,10 +8,11 @@
 #include <memory>
 #include <variant>
 
-#include "mvcc_data.h"
+#include "mvcc_data.hpp"
 #include "segment.hpp"
 #include "../types.hpp"
-#include "../assert.h"
+#include "../assert.hpp"
+#include "../utils/atomic_max.hpp"
 
 #define CHUNK_SIZE 65536
 
@@ -58,6 +59,11 @@ public:
         return _is_mutable.load();
     }
 
+    bool has_mvcc_data() const {
+
+        return _mvcc_data != nullptr;
+    }
+
     void set_immutable() {
         auto success = true;
         Assert(_is_mutable.compare_exchange_strong(success, false), "Only mutable chunks can be set immutable.");
@@ -77,17 +83,26 @@ public:
         }
     }
 
+    std::shared_ptr<MvccData> mvcc_data() const {
+        return _mvcc_data;
+    }
+
+    ColumnCount column_count() const {
+        return _segments.size();
+    }
+
 private:
     size_t _row_count;
     std::vector<std::shared_ptr<BaseSegment>> _segments;
     std::atomic_bool _is_mutable{true};
+    std::shared_ptr<MvccData> _mvcc_data;
 };
 
 // 表（Table）- 包含多个块
 class Table {
 public:
-    Table(std::vector<ColumnDefinition> column_defs, size_t chunk_size = 65536)    // 默认行数为65536
-        : _column_defs(std::move(column_defs)), _chunk_size(chunk_size) {}
+    Table(std::vector<ColumnDefinition> column_defs)    // 默认行数为65536
+        : _column_defs(std::move(column_defs)) {}
 
     // 生成指定行数的数据
     void generate_data(size_t total_rows) {
@@ -95,8 +110,8 @@ public:
         size_t remaining = total_rows;
         size_t start_index = 1;
         while (remaining > 0) {
-            size_t rows_in_chunk = std::min(remaining, _chunk_size);
-            auto chunk = std::make_shared<Chunk>(_column_defs);
+            size_t rows_in_chunk = std::min(remaining, (size_t) CHUNK_SIZE);
+            auto chunk = std::make_shared<Chunk>(_column_defs, rows_in_chunk);
             chunk->generate_data(rows_in_chunk, start_index);
             _chunks.push_back(chunk);
             remaining -= rows_in_chunk;
@@ -130,6 +145,10 @@ public:
 
         // append_chunk(segments, mvcc_data);
         _chunks.push_back(chunk);
+    }
+
+    ChunkOffset target_chunk_size() const {
+        return CHUNK_SIZE;
     }
 
     void output_data(const std::string& filepath, const std::vector<ColumnID>& column_ids) {
@@ -169,7 +188,6 @@ public:
 private:
     std::vector<ColumnDefinition> _column_defs;    // column_defs：不同列的数据类型
     std::vector<std::shared_ptr<Chunk>> _chunks;
-    size_t _chunk_size;    // 每个chunk的行数
     size_t _row_count;
     std::unique_ptr<std::mutex> _append_mutex;
 };

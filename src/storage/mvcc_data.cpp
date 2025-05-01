@@ -2,7 +2,7 @@
 // Created by zhengjin.wang on 25-4-29.
 //
 
-#include "mvcc_data.h"
+#include "mvcc_data.hpp"
 
 MvccData::MvccData(const size_t size, CommitID begin_commit_id) {
 
