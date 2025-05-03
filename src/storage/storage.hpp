@@ -20,7 +20,7 @@
 class Chunk {
 public:
     // column_defs：存储对应列的数据类型
-    Chunk(const std::vector<ColumnDefinition>& column_defs, int32_t num_rows = 0) {
+    Chunk(const std::vector<ColumnDefinition>& column_defs, int32_t num_rows = 0) : _column_defs(column_defs){
         for (const auto& def : column_defs) {
             _segments.emplace_back(BaseSegment::create_segment(def.type, def.is_pk, def.range_lower_bound, def.range_upper_bound, num_rows));
         }
@@ -28,7 +28,6 @@ public:
 
     // 生成该块的所有列数据
     void generate_data(size_t num_rows, size_t start_offset = 1) {
-        _row_count = num_rows;
         for (auto& seg : _segments) {
             if (seg->is_pk()) std::dynamic_pointer_cast<IntSegment>(seg)->generate_pk(num_rows, start_offset);
             else seg->generate_random(num_rows);
@@ -41,10 +40,6 @@ public:
 
     const std::vector<std::shared_ptr<BaseSegment>>& segments() const {
         return _segments;
-    }
-
-    size_t row_count() const {
-        return _row_count;
     }
 
     ChunkOffset size() const {
@@ -91,11 +86,20 @@ public:
         return _segments.size();
     }
 
+    const std::vector<ColumnDefinition>& column_defs() const {
+        return _column_defs;
+    }
+
+    void mark_as_full() {
+        _reached_target_size = true;
+    }
+
 private:
-    size_t _row_count;
+    std::vector<ColumnDefinition> _column_defs;    // column_defs：不同列的数据类型
     std::vector<std::shared_ptr<BaseSegment>> _segments;
     std::atomic_bool _is_mutable{true};
     std::shared_ptr<MvccData> _mvcc_data;
+    std::atomic_bool _reached_target_size{false};
 };
 
 // 表（Table）- 包含多个块
@@ -106,7 +110,6 @@ public:
 
     // 生成指定行数的数据
     void generate_data(size_t total_rows) {
-        _row_count = total_rows;
         size_t remaining = total_rows;
         size_t start_index = 1;
         while (remaining > 0) {
@@ -120,7 +123,15 @@ public:
     }
 
     size_t row_count() const {
-        return _row_count;
+        auto row_count = uint64_t{0};
+        const auto chunk_count = _chunks.size();
+        for (auto chunk_id = ChunkID{0}; chunk_id < chunk_count; ++chunk_id) {
+            const auto chunk = get_chunk(chunk_id);
+            if (chunk) {
+                row_count += chunk->size();
+            }
+        }
+        return row_count;
     }
 
     size_t chunk_count() const {
@@ -154,7 +165,7 @@ public:
     void output_data(const std::string& filepath, const std::vector<ColumnID>& column_ids) {
         std::ofstream out_file(filepath);
         for (auto& chunk : _chunks) {
-            size_t n = chunk->row_count();
+            size_t n = chunk->size();
             for (size_t i = 0; i < n; i++) {
                 std::string s = "";
                 for (auto& column_id: column_ids) {
@@ -188,7 +199,6 @@ public:
 private:
     std::vector<ColumnDefinition> _column_defs;    // column_defs：不同列的数据类型
     std::vector<std::shared_ptr<Chunk>> _chunks;
-    size_t _row_count;
     std::unique_ptr<std::mutex> _append_mutex;
 };
 #endif //STORAGE_HPP

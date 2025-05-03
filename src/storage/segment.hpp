@@ -86,6 +86,7 @@ public:
     _is_pk(is_pk), _range_lower_bound(range_lower_bound), _range_upper_bound(range_upper_bound){};
     virtual ~BaseSegment() = default;
     virtual void generate_random(size_t num_rows) = 0; // 随机生成数据
+    virtual void resize(int32_t num_rows) = 0;
     bool is_pk() const { return _is_pk; }
 
     static std::shared_ptr<BaseSegment> create_segment(const DataType& type, bool is_pk, float range_lower_bound, float range_upper_bound, int32_t num_rows = 0);
@@ -139,17 +140,21 @@ public:
         }
     }
 
-    const IntSegmentPosition at(int32_t i) const {
+    const IntSegmentPosition at(ChunkOffset i) const {
         return {_data[i], _null_values[i], i};
     }
 
-    void resize(int32_t num_rows) {
+    void resize(int32_t num_rows) override {
         _data.resize(num_rows);
         _null_values.resize(num_rows);
     }
 
     ChunkOffset size() const override {
         return _data.size();
+    }
+
+    std::vector<int> values() {
+        return _data;
     }
 
     std::vector<int> _data;
@@ -182,13 +187,17 @@ public:
         return _data[i];
     }
 
-    void resize(int32_t num_rows) {
+    void resize(int32_t num_rows) override {
         _data.resize(num_rows);
         _null_values.resize(num_rows);
     }
 
     ChunkOffset size() const override {
         return _data.size();
+    }
+
+    std::vector<float> values() {
+        return _data;
     }
 
     std::vector<float> _data;
@@ -226,13 +235,17 @@ public:
         return _data[i];
     }
 
-    void resize(int32_t num_rows) {
+    void resize(int32_t num_rows) override {
         _data.resize(num_rows);
         _null_values.resize(num_rows);
     }
 
     ChunkOffset size() const override {
         return _data.size();
+    }
+
+    std::vector<std::string> values() {
+        return _data;
     }
 
     std::vector<std::string> _data;

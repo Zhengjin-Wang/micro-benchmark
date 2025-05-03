@@ -11,15 +11,6 @@
 
 // #define BOOST_BITSET
 
-class RowID {
-public:
-    RowID() = default;
-    RowID(int32_t chunk_id, int32_t chunk_offset) : chunk_id(chunk_id), chunk_offset(chunk_offset) {}
-
-    int32_t chunk_id{0};
-    int32_t chunk_offset{0};
-};
-
 template <typename T>
 struct PartitionedElement {
     PartitionedElement() = default;
@@ -77,12 +68,12 @@ RadixContainer<T> materialize_input(const std::shared_ptr<const Table>& in_table
     radix_container.resize(chunk_count);
 
     // copy memory
-    for (int32_t chunk_id = 0; chunk_id < chunk_count; ++chunk_id){
+    for (uint32_t chunk_id = 0; chunk_id < chunk_count; ++chunk_id){
         auto chunk_in = in_table->get_chunk(chunk_id);
         auto base_segment = chunk_in->get_segment(column_id);
         auto segment = std::dynamic_pointer_cast<IntSegment>(base_segment);
         // auto segment = base_segment;
-        const auto num_rows = chunk_in->row_count();
+        const auto num_rows = chunk_in->size();
 
         auto& elements = radix_container[chunk_id].elements;
         auto& null_values = radix_container[chunk_id].null_values;
@@ -94,7 +85,7 @@ RadixContainer<T> materialize_input(const std::shared_ptr<const Table>& in_table
 
         auto histogram = std::vector<size_t>(num_radix_partitions);
 
-        for (int32_t i = 0; i < num_rows; ++i) {
+        for (uint32_t i = 0; i < num_rows; ++i) {
             auto& value = segment->at(i);
             auto& actual_value = value.value();
             // auto& actual_value = std::get<T>(value.value());
