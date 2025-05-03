@@ -16,19 +16,35 @@ struct ChunkRange {
   ChunkOffset end_chunk_offset{};
 };
 
-template <typename T>
+
 void copy_value_range(const std::shared_ptr<const BaseSegment>& source_abstract_segment,
                       ChunkOffset source_begin_offset, const std::shared_ptr<BaseSegment>& target_abstract_segment,
-                      ChunkOffset target_begin_offset, ChunkOffset length) {
+                      ChunkOffset target_begin_offset, ChunkOffset length, const DataType& type) {
 //  DebugAssert(source_abstract_segment->size() >= source_begin_offset + length, "Source Segment out-of-bounds.");
 //  DebugAssert(target_abstract_segment->size() >= target_begin_offset + length, "Target Segment out-of-bounds.");
-  
-  const auto target_value_segment = std::dynamic_pointer_cast<ValueSegment<T>>(target_abstract_segment);
-  const auto source_value_segment = std::dynamic_pointer_cast<const ValueSegment<T>>(source_abstract_segment)
+  if (std::holds_alternative<int>(type)) {
+    const auto target_value_segment = std::dynamic_pointer_cast<IntSegment>(target_abstract_segment);
+    const auto source_value_segment = std::dynamic_pointer_cast<const IntSegment>(source_abstract_segment);
 
-  auto& target_values = target_value_segment->values();
-  std::copy_n(source_value_segment->values().begin() + source_begin_offset, length,
-                target_values.begin() + target_begin_offset);
+    const auto& target_values = target_value_segment->values();
+    std::copy_n(source_value_segment->values().begin() + source_begin_offset, length,
+                  target_values.begin() + target_begin_offset);
+  } else if (std::holds_alternative<float>(type)) {
+    const auto target_value_segment = std::dynamic_pointer_cast<FloatSegment>(target_abstract_segment);
+    const auto source_value_segment = std::dynamic_pointer_cast<const FloatSegment>(source_abstract_segment);
+
+    const auto& target_values = target_value_segment->values();
+    std::copy_n(source_value_segment->values().begin() + source_begin_offset, length,
+                  target_values.begin() + target_begin_offset);
+  } else if (std::holds_alternative<std::string>(type)) {
+    const auto target_value_segment = std::dynamic_pointer_cast<StringSegment>(target_abstract_segment);
+    const auto source_value_segment = std::dynamic_pointer_cast<const StringSegment>(source_abstract_segment);
+
+    const auto& target_values = target_value_segment->values();
+    std::copy_n(source_value_segment->values().begin() + source_begin_offset, length,
+                  target_values.begin() + target_begin_offset);
+  }
+
   /**
    * If the source Segment is a ValueSegment, take a fast path to copy the data. Otherwise, take a (potentially slower)
    * fallback path.
@@ -146,14 +162,11 @@ std::shared_ptr<const Table> insert(std::shared_ptr<Table> _target_table, std::s
       // Copy from the source into the target Segments.
       const auto column_count = target_chunk->column_count();
       for (auto column_id = ColumnID{0}; column_id < column_count; ++column_id) {
+        auto type = target_chunk->column_defs()[column_id].type;
         const auto& source_segment = source_chunk->get_segment(column_id);
         const auto& target_segment = target_chunk->get_segment(column_id);
-
-        resolve_data_type(_target_table->column_data_type(column_id), [&](const auto data_type_t) {
-          using ColumnDataType = typename decltype(data_type_t)::type;
-          copy_value_range<ColumnDataType>(source_segment, source_row_id.chunk_offset, target_segment,
-                                           target_chunk_offset, num_rows_current_iteration);
-        });
+        copy_value_range(source_segment, source_row_id.chunk_offset, target_segment,
+                                           target_chunk_offset, num_rows_current_iteration, type);
       }
 
       if (num_rows_current_iteration == source_chunk_remaining_rows) {

@@ -153,6 +153,10 @@ public:
         return _data.size();
     }
 
+    const std::vector<int> values() const {
+        return _data;
+    }
+
     std::vector<int> values() {
         return _data;
     }
@@ -194,6 +198,10 @@ public:
 
     ChunkOffset size() const override {
         return _data.size();
+    }
+
+    const std::vector<float> values() const {
+        return _data;
     }
 
     std::vector<float> values() {
@@ -242,6 +250,10 @@ public:
 
     ChunkOffset size() const override {
         return _data.size();
+    }
+
+    const std::vector<std::string> values() const {
+        return _data;
     }
 
     std::vector<std::string> values() {

@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "src/operator/join_hash.hpp"
+#include "src/operator/insert.hpp"
 #include "src/storage/storage.hpp"
 #include "src/storage/segment.hpp"
 
