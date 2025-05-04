@@ -153,11 +153,11 @@ public:
         return _data.size();
     }
 
-    const std::vector<int> values() const {
+    const std::vector<int>& values() const {
         return _data;
     }
 
-    std::vector<int> values() {
+    std::vector<int>& values() {
         return _data;
     }
 
@@ -200,11 +200,11 @@ public:
         return _data.size();
     }
 
-    const std::vector<float> values() const {
+    const std::vector<float>& values() const {
         return _data;
     }
 
-    std::vector<float> values() {
+    std::vector<float>& values() {
         return _data;
     }
 
@@ -252,11 +252,11 @@ public:
         return _data.size();
     }
 
-    const std::vector<std::string> values() const {
+    const std::vector<std::string>& values() const {
         return _data;
     }
 
-    std::vector<std::string> values() {
+    std::vector<std::string>& values() {
         return _data;
     }
 

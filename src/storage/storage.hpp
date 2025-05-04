@@ -20,7 +20,7 @@
 class Chunk {
 public:
     // column_defs：存储对应列的数据类型
-    Chunk(const std::vector<ColumnDefinition>& column_defs, int32_t num_rows = 0) : _column_defs(column_defs){
+    Chunk(const std::vector<ColumnDefinition>& column_defs, int32_t num_rows, const std::shared_ptr<MvccData>& mvcc_data) : _column_defs(column_defs), _mvcc_data(mvcc_data){
         for (const auto& def : column_defs) {
             _segments.emplace_back(BaseSegment::create_segment(def.type, def.is_pk, def.range_lower_bound, def.range_upper_bound, num_rows));
         }
@@ -96,9 +96,9 @@ public:
 
 private:
     std::vector<ColumnDefinition> _column_defs;    // column_defs：不同列的数据类型
+    std::shared_ptr<MvccData> _mvcc_data;
     std::vector<std::shared_ptr<BaseSegment>> _segments;
     std::atomic_bool _is_mutable{true};
-    std::shared_ptr<MvccData> _mvcc_data;
     std::atomic_bool _reached_target_size{false};
 };
 
@@ -106,7 +106,8 @@ private:
 class Table {
 public:
     Table(std::vector<ColumnDefinition> column_defs)    // 默认行数为65536
-        : _column_defs(std::move(column_defs)) {}
+        : _column_defs(std::move(column_defs)),
+          _append_mutex(std::make_unique<std::mutex>()){}
 
     // 生成指定行数的数据
     void generate_data(size_t total_rows) {
@@ -114,7 +115,8 @@ public:
         size_t start_index = 1;
         while (remaining > 0) {
             size_t rows_in_chunk = std::min(remaining, (size_t) CHUNK_SIZE);
-            auto chunk = std::make_shared<Chunk>(_column_defs, rows_in_chunk);
+            auto mvcc_data = std::make_shared<MvccData>(rows_in_chunk, CommitID{0});
+            auto chunk = std::make_shared<Chunk>(_column_defs, rows_in_chunk, mvcc_data);
             chunk->generate_data(rows_in_chunk, start_index);
             _chunks.push_back(chunk);
             remaining -= rows_in_chunk;
@@ -147,7 +149,8 @@ public:
     }
 
     void append_mutable_chunk() {
-        auto chunk = std::make_shared<Chunk>(_column_defs, CHUNK_SIZE);
+        auto mvcc_data = std::make_shared<MvccData>(CHUNK_SIZE, CommitID{0});
+        auto chunk = std::make_shared<Chunk>(_column_defs, CHUNK_SIZE, mvcc_data);
 
         // auto mvcc_data = std::shared_ptr<MvccData>{};
         // if (_use_mvcc == UseMvcc::Yes) {
