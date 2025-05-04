@@ -115,7 +115,7 @@ public:
         size_t start_index = 1;
         while (remaining > 0) {
             size_t rows_in_chunk = std::min(remaining, (size_t) CHUNK_SIZE);
-            auto mvcc_data = std::make_shared<MvccData>(rows_in_chunk, CommitID{0});
+            auto mvcc_data = std::make_shared<MvccData>(CHUNK_SIZE, CommitID{0});
             auto chunk = std::make_shared<Chunk>(_column_defs, rows_in_chunk, mvcc_data);
             chunk->generate_data(rows_in_chunk, start_index);
             _chunks.push_back(chunk);
@@ -150,7 +150,7 @@ public:
 
     void append_mutable_chunk() {
         auto mvcc_data = std::make_shared<MvccData>(CHUNK_SIZE, CommitID{0});
-        auto chunk = std::make_shared<Chunk>(_column_defs, CHUNK_SIZE, mvcc_data);
+        auto chunk = std::make_shared<Chunk>(_column_defs, 0, mvcc_data);
 
         // auto mvcc_data = std::shared_ptr<MvccData>{};
         // if (_use_mvcc == UseMvcc::Yes) {

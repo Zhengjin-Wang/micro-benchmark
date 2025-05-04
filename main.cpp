@@ -60,7 +60,11 @@ void test_join_hash(std::shared_ptr<const Table> r_table, std::shared_ptr<const 
 }
 
 void test_insert(std::shared_ptr<Table> target_table, std::shared_ptr<const Table> source_table) {
+    auto start = std::chrono::high_resolution_clock::now();
     insert(target_table, source_table);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration<double>(end - start).count();
+    std::cerr << "insert time: " << duration << "s" << std::endl;
 }
 
 void printUsage() {

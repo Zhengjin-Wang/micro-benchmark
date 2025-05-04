@@ -65,6 +65,7 @@ std::shared_ptr<const Table> insert(std::shared_ptr<Table> _target_table, std::s
     }
 
     while (remaining_rows > 0) {
+      // std::cout << remaining_rows << std::endl;
       auto target_chunk_id = ChunkID{(ChunkID) _target_table->chunk_count() - 1};
       auto target_chunk = _target_table->get_chunk(target_chunk_id);
       const auto target_size = CHUNK_SIZE;
