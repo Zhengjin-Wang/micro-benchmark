@@ -9,7 +9,7 @@
 #include "src/storage/storage.hpp"
 #include "src/storage/segment.hpp"
 
-std::vector<std::shared_ptr<Table>> generate_tables(int sf, bool output_data) {
+std::vector<std::shared_ptr<Table>> generate_tables(int sf, bool output_data, std::string r_table_filepath, std::string s_table_filepath) {
     // std::cout << "sf=" << sf << std::endl;
     size_t m = 159526 * sf; // r_table_size
     size_t n = 6001215 * sf; // s_table_size
@@ -20,18 +20,18 @@ std::vector<std::shared_ptr<Table>> generate_tables(int sf, bool output_data) {
     // 定义表结构：三列（int, float, string）
     std::vector<ColumnDefinition> r_column_defs = {
         {int{}, true, 0, 0},
-        {int{}, false, 1, 100},
-        {std::string{}, false, 0, 0}
+        // {int{}, false, 1, 100},
+        // {std::string{}, false, 0, 0}
     };
     const auto r_table = std::make_shared<Table>(r_column_defs);
 
     std::vector<ColumnDefinition> s_column_defs = {
         {int{}, false, (float) pk_lower_bound, (float) pk_upper_bound},
-        {int{}, false, 1, 50},
-        {float{}, false, 900.0, 9000.0},
-        {float{}, false, 0.01, 0.10},
-        {float{}, false, 0.01, 0.10},
-        {int{}, false, 1, 7}
+        // {int{}, false, 1, 50},
+        // {float{}, false, 900.0, 9000.0},
+        // {float{}, false, 0.01, 0.10},
+        // {float{}, false, 0.01, 0.10},
+        // {int{}, false, 1, 7}
     };
     const auto s_table = std::make_shared<Table>(s_column_defs);
 
@@ -42,8 +42,8 @@ std::vector<std::shared_ptr<Table>> generate_tables(int sf, bool output_data) {
     auto duration = std::chrono::duration<double>(end - start).count();
     std::cerr << "Generate data time: " << duration << "s" << std::endl;
     if (output_data){
-        r_table->output_data("r_table.csv", {0});
-        s_table->output_data("s_table.csv", {0});
+        r_table->output_data(r_table_filepath, {0});
+        s_table->output_data(s_table_filepath, {0});
     }
 
     return {r_table, s_table};
@@ -129,20 +129,25 @@ int main(int argc, char** argv) {
     std::cout << "sf=" << sf << ", output_data=" << output_data<< ", test_op=" << test_op<<std::endl;
 
     // 生成表
-    auto tables = generate_tables(sf, output_data);
-    auto r_table = tables[0];
-    auto s_table = tables[1];
+
 
     // 测试算子
     if (test_op == "join_hash") {
+        auto tables = generate_tables(sf, output_data, "r_table.csv", "s_table.csv");
+        auto r_table = tables[0];
+        auto s_table = tables[1];
         test_join_hash(r_table, s_table);
     }
     else if (test_op == "insert") {
-        auto insert_tables = generate_tables(1, false);
+        auto tables = generate_tables(0, output_data, "r_table.csv", "s_table.csv");
+        auto r_table = tables[0];
+        auto s_table = tables[1];
+        auto insert_tables = generate_tables(sf, output_data, "r_table_insert.csv", "s_table_insert.csv");
         auto r_insert = insert_tables[0];
         auto s_insert = insert_tables[1];
         test_insert(r_table, r_insert);
         test_insert(s_table, s_insert);
+        // r_table->output_data("a.log", {0});
     }
 
     return 0;

@@ -19,37 +19,81 @@ struct ChunkRange {
 
 void copy_value_range(const std::shared_ptr<const BaseSegment>& source_abstract_segment,
                       ChunkOffset source_begin_offset, const std::shared_ptr<BaseSegment>& target_abstract_segment,
-                      ChunkOffset target_begin_offset, ChunkOffset length, const DataType& type) {
+                      ChunkOffset target_begin_offset, ChunkOffset length, const DataType& type, bool is_value_segment = false) {
+  // auto start = std::chrono::high_resolution_clock::now();
+  // std::cerr << target_begin_offset << " " << source_begin_offset << " " << length << std::endl;
 //  DebugAssert(source_abstract_segment->size() >= source_begin_offset + length, "Source Segment out-of-bounds.");
 //  DebugAssert(target_abstract_segment->size() >= target_begin_offset + length, "Target Segment out-of-bounds.");
-  if (std::holds_alternative<int>(type)) {
-    auto target_value_segment = std::dynamic_pointer_cast<IntSegment>(target_abstract_segment);
-    const auto source_value_segment = std::dynamic_pointer_cast<const IntSegment>(source_abstract_segment);
+  if (is_value_segment) {
+    if (std::holds_alternative<int>(type)) {
+      auto target_value_segment = std::dynamic_pointer_cast<IntSegment>(target_abstract_segment);
+      const auto source_value_segment = std::dynamic_pointer_cast<const IntSegment>(source_abstract_segment);
 
-    auto& target_values = target_value_segment->values();
-    std::copy_n(source_value_segment->values().begin() + source_begin_offset, length,
-                  target_values.begin() + target_begin_offset);
-  } else if (std::holds_alternative<float>(type)) {
-    auto target_value_segment = std::dynamic_pointer_cast<FloatSegment>(target_abstract_segment);
-    const auto source_value_segment = std::dynamic_pointer_cast<const FloatSegment>(source_abstract_segment);
+      auto& target_values = target_value_segment->values();
+      std::copy_n(source_value_segment->values().begin() + source_begin_offset, length,
+                    target_values.begin() + target_begin_offset);
+    } else if (std::holds_alternative<float>(type)) {
+      auto target_value_segment = std::dynamic_pointer_cast<FloatSegment>(target_abstract_segment);
+      const auto source_value_segment = std::dynamic_pointer_cast<const FloatSegment>(source_abstract_segment);
 
-    auto& target_values = target_value_segment->values();
-    std::copy_n(source_value_segment->values().begin() + source_begin_offset, length,
-                  target_values.begin() + target_begin_offset);
-  } else if (std::holds_alternative<std::string>(type)) {
-    auto target_value_segment = std::dynamic_pointer_cast<StringSegment>(target_abstract_segment);
-    const auto source_value_segment = std::dynamic_pointer_cast<const StringSegment>(source_abstract_segment);
+      auto& target_values = target_value_segment->values();
+      std::copy_n(source_value_segment->values().begin() + source_begin_offset, length,
+                    target_values.begin() + target_begin_offset);
+    } else if (std::holds_alternative<std::string>(type)) {
+      auto target_value_segment = std::dynamic_pointer_cast<StringSegment>(target_abstract_segment);
+      const auto source_value_segment = std::dynamic_pointer_cast<const StringSegment>(source_abstract_segment);
 
-    auto& target_values = target_value_segment->values();
-    std::copy_n(source_value_segment->values().begin() + source_begin_offset, length,
-                  target_values.begin() + target_begin_offset);
+      auto& target_values = target_value_segment->values();
+      std::copy_n(source_value_segment->values().begin() + source_begin_offset, length,
+                    target_values.begin() + target_begin_offset);
+    }
+  } else {
+    if (std::holds_alternative<int>(type)) {
+      auto target_value_segment = std::dynamic_pointer_cast<IntSegment>(target_abstract_segment);
+      const auto source_value_segment = std::dynamic_pointer_cast<const IntSegment>(source_abstract_segment);
+
+      auto& target_values = target_value_segment->values();
+      auto source_iter = source_value_segment->values().begin() + source_begin_offset;
+      auto target_iter = target_values.begin() + target_begin_offset;
+      for (auto index = ChunkOffset{0}; index < length; ++index) {
+        *target_iter = *source_iter;
+        ++source_iter;
+        ++target_iter;
+      }
+    } else if (std::holds_alternative<float>(type)) {
+      auto target_value_segment = std::dynamic_pointer_cast<FloatSegment>(target_abstract_segment);
+      const auto source_value_segment = std::dynamic_pointer_cast<const FloatSegment>(source_abstract_segment);
+
+      auto& target_values = target_value_segment->values();
+      auto source_iter = source_value_segment->values().begin() + source_begin_offset;
+      auto target_iter = target_values.begin() + target_begin_offset;
+      for (auto index = ChunkOffset{0}; index < length; ++index) {
+        *target_iter = *source_iter;
+        ++source_iter;
+        ++target_iter;
+      }
+    } else if (std::holds_alternative<std::string>(type)) {
+      auto target_value_segment = std::dynamic_pointer_cast<StringSegment>(target_abstract_segment);
+      const auto source_value_segment = std::dynamic_pointer_cast<const StringSegment>(source_abstract_segment);
+
+      auto& target_values = target_value_segment->values();
+      auto source_iter = source_value_segment->values().begin() + source_begin_offset;
+      auto target_iter = target_values.begin() + target_begin_offset;
+      for (auto index = ChunkOffset{0}; index < length; ++index) {
+        *target_iter = *source_iter;
+        ++source_iter;
+        ++target_iter;
+      }
+    }
   }
 
   /**
    * If the source Segment is a ValueSegment, take a fast path to copy the data. Otherwise, take a (potentially slower)
    * fallback path.
    */
-
+  // auto end = std::chrono::high_resolution_clock::now();
+  // auto duration = std::chrono::duration<double>(end - start).count();
+  // std::cerr << "insert copy_value_range time: " << duration << "s" << std::endl;
 }
 
 std::shared_ptr<const Table> insert(std::shared_ptr<Table> _target_table, std::shared_ptr<const Table>& values_to_insert) {
@@ -57,6 +101,7 @@ std::shared_ptr<const Table> insert(std::shared_ptr<Table> _target_table, std::s
 
   // stage 1
   {
+    auto start = std::chrono::high_resolution_clock::now();
     const auto append_lock = _target_table->acquire_append_mutex();
     auto remaining_rows = values_to_insert->row_count();
 
@@ -72,6 +117,7 @@ std::shared_ptr<const Table> insert(std::shared_ptr<Table> _target_table, std::s
 
       // If the last chunk of the target table is either immutable or full, append a new mutable chunk.
       if (!target_chunk->is_mutable() || target_chunk->size() == target_size) {
+      // if (true) {
         _target_table->append_mutable_chunk();
         ++target_chunk_id;
         target_chunk = _target_table->get_chunk(target_chunk_id);
@@ -139,12 +185,15 @@ std::shared_ptr<const Table> insert(std::shared_ptr<Table> _target_table, std::s
 
       remaining_rows -= num_rows_for_target_chunk;
     }
-
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration<double>(end - start).count();
+    std::cerr << "insert stage1 time: " << duration << "s" << std::endl;
   } // stage 1 end
 
     /**
    * 2. Insert the Data into the memory allocated in the first step without holding a lock on the Table.
    */
+  auto start = std::chrono::high_resolution_clock::now();
   auto source_row_id = RowID{ChunkID{0}, ChunkOffset{0}};
 
   for (const auto& target_chunk_range : _target_chunk_ranges) {
@@ -182,6 +231,9 @@ std::shared_ptr<const Table> insert(std::shared_ptr<Table> _target_table, std::s
       target_chunk_range_remaining_rows -= num_rows_current_iteration;
     }
   }
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration<double>(end - start).count();
+  std::cerr << "insert stage2 time: " << duration << "s" << std::endl;
 
   return _target_table;
 }
