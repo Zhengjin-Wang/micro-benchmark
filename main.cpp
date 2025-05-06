@@ -7,6 +7,7 @@
 #include "src/operator/join_hash.hpp"
 #include "src/operator/insert.hpp"
 #include "src/operator/delete.hpp"
+#include "src/operator/update.hpp"
 #include "src/storage/storage.hpp"
 #include "src/storage/segment.hpp"
 #include "src/storage/reference_segment.hpp"
@@ -75,6 +76,14 @@ void test_delete(std::shared_ptr<Table> target_table) {
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration<double>(end - start).count();
     std::cerr << "delete time: " << duration << "s" << std::endl;
+}
+
+void test_update(std::shared_ptr<Table>& target_table, std::shared_ptr<const Table>& values_to_insert, std::shared_ptr<Table>& rows_to_delete) {
+    auto start = std::chrono::high_resolution_clock::now();
+    update(target_table, values_to_insert, rows_to_delete);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration<double>(end - start).count();
+    std::cerr << "update time: " << duration << "s" << std::endl;
 }
 
 void printUsage() {
@@ -167,6 +176,18 @@ int main(int argc, char** argv) {
         auto reference_s_table = ReferenceSegment::create_reference_table(s_table);
         test_delete(reference_r_table);
         test_delete(reference_s_table);
+    }
+    else if (test_op == "update") {
+        auto tables = generate_tables(sf, output_data, "r_table.csv", "s_table.csv");
+        auto r_table = tables[0];
+        auto s_table = tables[1];
+        auto reference_r_table = ReferenceSegment::create_reference_table(r_table);
+        auto reference_s_table = ReferenceSegment::create_reference_table(s_table);
+        auto insert_tables = generate_tables(sf, output_data, "r_table_insert.csv", "s_table_insert.csv");
+        std::shared_ptr<const Table> r_insert = insert_tables[0];
+        std::shared_ptr<const Table> s_insert = insert_tables[1];
+        test_update(r_table, r_insert, reference_r_table);
+        test_update(s_table, s_insert, reference_s_table);
     }
 
     return 0;
