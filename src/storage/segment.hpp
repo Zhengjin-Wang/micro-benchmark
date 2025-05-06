@@ -84,6 +84,7 @@ class BaseSegment {
 public:
     explicit BaseSegment(bool is_pk, float range_lower_bound, float range_upper_bound, int32_t num_rows = 0):
     _is_pk(is_pk), _range_lower_bound(range_lower_bound), _range_upper_bound(range_upper_bound){};
+    BaseSegment(){};
     virtual ~BaseSegment() = default;
     virtual void generate_random(size_t num_rows) = 0; // 随机生成数据
     virtual void resize(int32_t num_rows) = 0;

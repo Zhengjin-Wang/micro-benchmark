@@ -26,6 +26,10 @@ public:
         }
     }
 
+    // referenced segment
+    Chunk(const std::vector<ColumnDefinition>& column_defs, const std::vector<std::shared_ptr<BaseSegment>>& segments) : _column_defs(column_defs), _segments(segments){
+    }
+
     // 生成该块的所有列数据
     void generate_data(size_t num_rows, size_t start_offset = 1) {
         for (auto& seg : _segments) {
@@ -161,6 +165,10 @@ public:
         _chunks.push_back(chunk);
     }
 
+    void append_reference_chunk(const std::shared_ptr<Chunk>& chunk) {
+        _chunks.push_back(chunk);
+    }
+
     ChunkOffset target_chunk_size() const {
         return CHUNK_SIZE;
     }
@@ -197,6 +205,14 @@ public:
 
     std::unique_lock<std::mutex> acquire_append_mutex() {
         return std::unique_lock<std::mutex>(*_append_mutex);
+    }
+
+    const DataType& get_column_type(ColumnID column_id) const {
+        return _column_defs[column_id].type;
+    }
+
+    const std::vector<ColumnDefinition>& column_defs() const {
+        return _column_defs;
     }
 
 private:
