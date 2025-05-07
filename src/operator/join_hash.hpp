@@ -66,9 +66,7 @@ RadixContainer<T> materialize_input(const std::shared_ptr<const Table>& in_table
     // radix_container copy
     auto radix_container = RadixContainer<T>{};
     radix_container.resize(chunk_count);
-
-    // copy memory
-    for (uint32_t chunk_id = 0; chunk_id < chunk_count; ++chunk_id){
+    auto materialize = [&](uint32_t chunk_id) {
         auto chunk_in = in_table->get_chunk(chunk_id);
         auto base_segment = chunk_in->get_segment(column_id);
         auto segment = std::dynamic_pointer_cast<IntSegment>(base_segment);
@@ -110,8 +108,19 @@ RadixContainer<T> materialize_input(const std::shared_ptr<const Table>& in_table
         }
 
         histograms[chunk_id] = std::move(histogram);
+    };
+    // copy memory
+    std::vector<std::future<void>> futures;
+    for (uint32_t chunk_id = 0; chunk_id < chunk_count; ++chunk_id){
+        futures.emplace_back(std::async(std::launch::async, materialize, chunk_id));
 
     }
+
+    // 等待所有线程完成
+    for (auto& future : futures) {
+        future.get();
+    }
+
     if (DEBUG) {
         // for (auto& partition:radix_container) {
         //     for (auto& element : partition.elements) {
