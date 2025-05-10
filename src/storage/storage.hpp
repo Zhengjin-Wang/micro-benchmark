@@ -207,7 +207,7 @@ public:
         return std::unique_lock<std::mutex>(*_append_mutex);
     }
 
-    const DataType& get_column_type(ColumnID column_id) const {
+    const DataType& column_data_type(ColumnID column_id) const {
         return _column_defs[column_id].type;
     }
 

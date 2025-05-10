@@ -113,7 +113,6 @@ RadixContainer<T> materialize_input(const std::shared_ptr<const Table>& in_table
     std::vector<std::future<void>> futures;
     for (uint32_t chunk_id = 0; chunk_id < chunk_count; ++chunk_id){
         futures.emplace_back(std::async(std::launch::async, materialize, chunk_id));
-
     }
 
     // 等待所有线程完成

@@ -8,6 +8,7 @@
 #include "src/operator/insert.hpp"
 #include "src/operator/delete.hpp"
 #include "src/operator/update.hpp"
+#include "src/operator/aggregate_hash.hpp"
 #include "src/storage/storage.hpp"
 #include "src/storage/segment.hpp"
 #include "src/storage/reference_segment.hpp"
@@ -84,6 +85,14 @@ void test_update(std::shared_ptr<Table>& target_table, std::shared_ptr<const Tab
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration<double>(end - start).count();
     std::cerr << "update time: " << duration << "s" << std::endl;
+}
+
+void test_aggregate_hash(std::shared_ptr<Table>& target_table, const std::vector<std::string>& aggregates, const std::vector<ColumnID>& _groupby_column_ids) {
+    auto start = std::chrono::high_resolution_clock::now();
+    aggregate_hash(target_table, aggregates, _groupby_column_ids);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration<double>(end - start).count();
+    std::cerr << "aggregate_hash time: " << duration << "s" << std::endl;
 }
 
 void printUsage() {
@@ -188,6 +197,12 @@ int main(int argc, char** argv) {
         std::shared_ptr<const Table> s_insert = insert_tables[1];
         test_update(r_table, r_insert, reference_r_table);
         test_update(s_table, s_insert, reference_s_table);
+    }
+    else if (test_op == "aggregate_hash") {
+        auto tables = generate_tables(sf, output_data, "r_table.csv", "s_table.csv");
+        auto r_table = tables[0];
+        auto s_table = tables[1];
+        test_aggregate_hash(s_table, {}, {0});
     }
 
     return 0;
