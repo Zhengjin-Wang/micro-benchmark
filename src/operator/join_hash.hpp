@@ -137,10 +137,126 @@ RadixContainer<T> materialize_input(const std::shared_ptr<const Table>& in_table
 
 }
 
+template <typename T, typename HashedType, bool keep_null_values>
+RadixContainer<T> partition_by_radix(const RadixContainer<T>& radix_container,
+                                     std::vector<std::vector<size_t>>& histograms, const size_t radix_bits,
+                                     const BloomFilter& input_bloom_filter = ALL_TRUE_BLOOM_FILTER) {
+  if (radix_container.empty()) {
+    return radix_container;
+  }
 
+  if constexpr (keep_null_values) {
+    Assert(radix_container[0].elements.size() == radix_container[0].null_values.size(),
+           "partition_by_radix() called with NULL consideration but radix container does not store any NULL "
+           "value information");
+  }
+
+  const std::hash<HashedType> hash_function;
+
+  const auto input_partition_count = radix_container.size();
+  const auto output_partition_count = size_t{1} << radix_bits;
+
+  // currently, we just do one pass
+  const size_t pass = 0;
+  const size_t radix_mask = static_cast<uint32_t>(std::pow(2, radix_bits * (pass + 1)) - 1);
+
+  // allocate new (shared) output
+  auto output = RadixContainer<T>(output_partition_count);
+
+  Assert(histograms.size() == input_partition_count, "Expected one histogram per input partition");
+  Assert(histograms[0].size() == output_partition_count, "Expected one histogram bucket per output partition");
+
+  // Writing to std::vector<bool> is not thread-safe if the same byte is being written to. For now, we temporarily
+  // use a std::vector<char> and compress it into an std::vector<bool> later.
+  auto null_values_as_char = std::vector<std::vector<char>>(output_partition_count);
+
+  // output_offsets_by_input_partition[input_partition_idx][output_partition_idx] holds the first offset in the
+  // bucket written for input_partition_idx
+  auto output_offsets_by_input_partition =
+      std::vector<std::vector<size_t>>(input_partition_count, std::vector<size_t>(output_partition_count));
+  for (auto output_partition_idx = size_t{0}; output_partition_idx < output_partition_count; ++output_partition_idx) {
+    auto this_output_partition_size = size_t{0};
+    for (auto input_partition_idx = size_t{0}; input_partition_idx < input_partition_count; ++input_partition_idx) {
+      output_offsets_by_input_partition[input_partition_idx][output_partition_idx] = this_output_partition_size;
+      this_output_partition_size += histograms[input_partition_idx][output_partition_idx];
+    }
+
+    output[output_partition_idx].elements.resize(this_output_partition_size);
+    if (keep_null_values) {
+      output[output_partition_idx].null_values.resize(this_output_partition_size);
+      null_values_as_char[output_partition_idx].resize(this_output_partition_size);
+    }
+  }
+
+    std::vector<std::future<void>> jobs;
+  jobs.reserve(input_partition_count);
+
+  for (auto input_partition_idx = ChunkID{0}; input_partition_idx < input_partition_count; ++input_partition_idx) {
+    const auto& input_partition = radix_container[input_partition_idx];
+    const auto& elements = input_partition.elements;
+    const auto elements_count = elements.size();
+
+    const auto perform_partition = [&, input_partition_idx, elements_count]() {
+      for (auto input_idx = size_t{0}; input_idx < elements_count; ++input_idx) {
+        const auto& element = elements[input_idx];
+
+        if constexpr (!keep_null_values) {
+          DebugAssert(!(element.row_id == NULL_ROW_ID), "NULL_ROW_ID should not have made it this far");
+        }
+
+        const size_t radix = hash_function(static_cast<HashedType>(element.value)) & radix_mask;
+
+        auto& output_idx = output_offsets_by_input_partition[input_partition_idx][radix];
+        DebugAssert(output_idx < output[radix].elements.size(), "output_idx is completely out-of-bounds");
+        if (input_partition_idx < input_partition_count - 1) {
+          DebugAssert(output_idx < output_offsets_by_input_partition[input_partition_idx + 1][radix],
+                      "output_idx goes into next range");
+        }
+
+        // In case NULL values have been materialized in materialize_input(), we need to keep them during the radix
+        // clustering phase.
+        if constexpr (keep_null_values) {
+          null_values_as_char[radix][output_idx] = input_partition.null_values[input_idx];
+        }
+
+        output[radix].elements[output_idx] = element;
+
+        ++output_idx;
+      }
+    };
+    if (JoinHash::JOB_SPAWN_THRESHOLD > elements_count) {
+      perform_partition();
+    } else {
+      jobs.emplace_back(std::make_shared<JobTask>(perform_partition));
+    }
+  }
+  Hyrise::get().scheduler()->schedule_and_wait_for_tasks(jobs);
+  jobs.clear();
+
+  // Compress null_values_as_char into partition.null_values
+  if constexpr (keep_null_values) {
+    for (auto output_partition_idx = size_t{0}; output_partition_idx < output_partition_count; ++output_partition_idx) {
+      jobs.emplace_back(std::make_shared<JobTask>([&, output_partition_idx]() {
+        const auto null_value_count = output[output_partition_idx].null_values.size();
+        for (auto element_idx = size_t{0}; element_idx < null_value_count; ++element_idx) {
+          output[output_partition_idx].null_values[element_idx] =
+              null_values_as_char[output_partition_idx][element_idx];
+        }
+      }));
+    }
+    Hyrise::get().scheduler()->schedule_and_wait_for_tasks(jobs);
+  }
+
+  return output;
+}
+
+// keep nulls is false
 template <typename BuildColumnType, typename ProbeColumnType, typename HashedType>
 void join_hash(std::shared_ptr<const Table> build_input_table, std::shared_ptr<const Table> probe_input_table,
                std::pair<ColumnID, ColumnID>& column_ids, const size_t radix_bits) {
+
+    auto keep_nulls_build_column = false;
+    auto keep_nulls_probe_column = false;
 
     auto histograms_build_column = std::vector<std::vector<size_t>>{};
     auto histograms_probe_column = std::vector<std::vector<size_t>>{};
@@ -178,6 +294,50 @@ void join_hash(std::shared_ptr<const Table> build_input_table, std::shared_ptr<c
         // been used here to filter non-matching values.
         materialize_probe_side(ALL_TRUE_BLOOM_FILTER);
         materialize_build_side(probe_side_bloom_filter);
+    }
+
+    if (radix_bits > 0) {
+        std::vector<std::future<void>> jobs;
+
+        jobs.emplace_back(std::async(std::launch::async,[&]() {
+          // radix partition the build table
+          if (keep_nulls_build_column) {
+            radix_build_column = partition_by_radix<BuildColumnType, HashedType, true>(
+                materialized_build_column, histograms_build_column, radix_bits);
+          } else {
+            radix_build_column = partition_by_radix<BuildColumnType, HashedType, false>(
+                materialized_build_column, histograms_build_column, radix_bits);
+          }
+
+          // After the data in materialized_build_column has been partitioned, it is not needed anymore.
+          materialized_build_column.clear();
+        }));
+
+        jobs.emplace_back(std::async(std::launch::async,[&]() {
+          // radix partition the probe column.
+          if (keep_nulls_probe_column) {
+            radix_probe_column = partition_by_radix<ProbeColumnType, HashedType, true>(
+                materialized_probe_column, histograms_probe_column, radix_bits);
+          } else {
+            radix_probe_column = partition_by_radix<ProbeColumnType, HashedType, false>(
+                materialized_probe_column, histograms_probe_column, radix_bits);
+          }
+
+          // After the data in materialized_probe_column has been partitioned, it is not needed anymore.
+          materialized_probe_column.clear();
+        }));
+
+        for (auto& future : jobs) {
+            future.get();
+        }
+
+        histograms_build_column.clear();
+        histograms_probe_column.clear();
+
+    } else {
+        // short cut: skip radix partitioning and use materialized data directly
+        radix_build_column = std::move(materialized_build_column);
+        radix_probe_column = std::move(materialized_probe_column);
     }
 }
 #endif //JOIN_HASH_HPP
