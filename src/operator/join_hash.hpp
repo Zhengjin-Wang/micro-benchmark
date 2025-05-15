@@ -10,6 +10,7 @@
 #define DEBUG 1
 
 // #define BOOST_BITSET
+static constexpr auto JOB_SPAWN_THRESHOLD = 500;
 
 template <typename T>
 struct PartitionedElement {
@@ -141,10 +142,11 @@ template <typename T, typename HashedType, bool keep_null_values>
 RadixContainer<T> partition_by_radix(const RadixContainer<T>& radix_container,
                                      std::vector<std::vector<size_t>>& histograms, const size_t radix_bits,
                                      const BloomFilter& input_bloom_filter = ALL_TRUE_BLOOM_FILTER) {
-  if (radix_container.empty()) {
+
+    if (radix_container.empty()) {
     return radix_container;
   }
-
+    auto start = std::chrono::high_resolution_clock::now();
   if constexpr (keep_null_values) {
     Assert(radix_container[0].elements.size() == radix_container[0].null_values.size(),
            "partition_by_radix() called with NULL consideration but radix container does not store any NULL "
@@ -200,18 +202,10 @@ RadixContainer<T> partition_by_radix(const RadixContainer<T>& radix_container,
       for (auto input_idx = size_t{0}; input_idx < elements_count; ++input_idx) {
         const auto& element = elements[input_idx];
 
-        if constexpr (!keep_null_values) {
-          DebugAssert(!(element.row_id == NULL_ROW_ID), "NULL_ROW_ID should not have made it this far");
-        }
 
         const size_t radix = hash_function(static_cast<HashedType>(element.value)) & radix_mask;
 
         auto& output_idx = output_offsets_by_input_partition[input_partition_idx][radix];
-        DebugAssert(output_idx < output[radix].elements.size(), "output_idx is completely out-of-bounds");
-        if (input_partition_idx < input_partition_count - 1) {
-          DebugAssert(output_idx < output_offsets_by_input_partition[input_partition_idx + 1][radix],
-                      "output_idx goes into next range");
-        }
 
         // In case NULL values have been materialized in materialize_input(), we need to keep them during the radix
         // clustering phase.
@@ -224,19 +218,21 @@ RadixContainer<T> partition_by_radix(const RadixContainer<T>& radix_container,
         ++output_idx;
       }
     };
-    if (JoinHash::JOB_SPAWN_THRESHOLD > elements_count) {
+    if (JOB_SPAWN_THRESHOLD > elements_count) {
       perform_partition();
     } else {
-      jobs.emplace_back(std::make_shared<JobTask>(perform_partition));
+      jobs.emplace_back(std::async(std::launch::async, perform_partition));
     }
   }
-  Hyrise::get().scheduler()->schedule_and_wait_for_tasks(jobs);
+    for (auto& future : jobs) {
+        future.get();
+    }
   jobs.clear();
 
   // Compress null_values_as_char into partition.null_values
   if constexpr (keep_null_values) {
     for (auto output_partition_idx = size_t{0}; output_partition_idx < output_partition_count; ++output_partition_idx) {
-      jobs.emplace_back(std::make_shared<JobTask>([&, output_partition_idx]() {
+      jobs.emplace_back(std::async(std::launch::async, [&, output_partition_idx]() {
         const auto null_value_count = output[output_partition_idx].null_values.size();
         for (auto element_idx = size_t{0}; element_idx < null_value_count; ++element_idx) {
           output[output_partition_idx].null_values[element_idx] =
@@ -244,9 +240,13 @@ RadixContainer<T> partition_by_radix(const RadixContainer<T>& radix_container,
         }
       }));
     }
-    Hyrise::get().scheduler()->schedule_and_wait_for_tasks(jobs);
+      for (auto& future : jobs) {
+          future.get();
+      }
   }
-
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration<double>(end - start).count();
+    std::cerr << "partition_by_radix time: " << duration << "s" << std::endl;
   return output;
 }
 
@@ -330,7 +330,6 @@ void join_hash(std::shared_ptr<const Table> build_input_table, std::shared_ptr<c
         for (auto& future : jobs) {
             future.get();
         }
-
         histograms_build_column.clear();
         histograms_probe_column.clear();
 

@@ -53,4 +53,6 @@ struct RowID {
     }
 };
 
+constexpr RowID NULL_ROW_ID = RowID{INVALID_CHUNK_ID, INVALID_CHUNK_OFFSET};
+
 #endif //TYPES_HPP
