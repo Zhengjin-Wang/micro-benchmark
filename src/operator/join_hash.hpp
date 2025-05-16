@@ -83,7 +83,7 @@ RadixContainer<T> materialize_input(const std::shared_ptr<const Table>& in_table
         null_values.resize(num_rows);
 
         auto histogram = std::vector<size_t>(num_radix_partitions);
-
+        int element_idx = 0;
         for (uint32_t i = 0; i < num_rows; ++i) {
             auto& value = segment->at(i);
             auto& actual_value = value.value();
@@ -98,8 +98,9 @@ RadixContainer<T> materialize_input(const std::shared_ptr<const Table>& in_table
             if(!skip) {
                 output_bloom_filter.set(hashed_value & BLOOM_FILTER_MASK);
 
-                elements[i] = PartitionedElement<T>{RowID{chunk_id, value.chunk_offset()}, actual_value};
-                null_values[i] = value.is_null();
+                elements[element_idx] = PartitionedElement<T>{RowID{chunk_id, value.chunk_offset()}, actual_value};
+                null_values[element_idx] = value.is_null();
+                ++element_idx;
 
                 if (radix_bits > 0) {
                     const Hash radix = hashed_value & radix_mask;
@@ -107,6 +108,8 @@ RadixContainer<T> materialize_input(const std::shared_ptr<const Table>& in_table
                 }
             }
         }
+        elements.resize(element_idx);
+        null_values.resize(element_idx);
 
         histograms[chunk_id] = std::move(histogram);
     };
@@ -184,10 +187,7 @@ RadixContainer<T> partition_by_radix(const RadixContainer<T>& radix_container,
     }
 
     output[output_partition_idx].elements.resize(this_output_partition_size);
-    if (keep_null_values) {
-      output[output_partition_idx].null_values.resize(this_output_partition_size);
-      null_values_as_char[output_partition_idx].resize(this_output_partition_size);
-    }
+
   }
 
     std::vector<std::future<void>> jobs;
@@ -202,18 +202,11 @@ RadixContainer<T> partition_by_radix(const RadixContainer<T>& radix_container,
       for (auto input_idx = size_t{0}; input_idx < elements_count; ++input_idx) {
         const auto& element = elements[input_idx];
 
-
         const size_t radix = hash_function(static_cast<HashedType>(element.value)) & radix_mask;
 
         auto& output_idx = output_offsets_by_input_partition[input_partition_idx][radix];
 
-        // In case NULL values have been materialized in materialize_input(), we need to keep them during the radix
-        // clustering phase.
-        if constexpr (keep_null_values) {
-          null_values_as_char[radix][output_idx] = input_partition.null_values[input_idx];
-        }
-
-        output[radix].elements[output_idx] = element;
+          output[radix].elements[output_idx] = element;
 
         ++output_idx;
       }

@@ -129,7 +129,7 @@ public:
 
     void generate_random(size_t num_rows) override {
         std::random_device rd;
-        std::mt19937 gen(1);
+        std::mt19937 gen(rd());
         std::uniform_int_distribution<> dis(static_cast<int>(_range_lower_bound), static_cast<int>(_range_upper_bound));
         // std::cout << static_cast<int>(_range_lower_bound) << " " << static_cast<int>(_range_upper_bound) << std::endl;
         _data.clear();
