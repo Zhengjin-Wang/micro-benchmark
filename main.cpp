@@ -61,7 +61,9 @@ void test_join_hash(std::shared_ptr<const Table> r_table, std::shared_ptr<const 
     join_hash<int, int, int>(r_table, s_table, column_ids, 10, test_op);
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration<double>(end - start).count();
-    // std::cerr << "join_hash time: " << duration << "s" << std::endl;
+    if(test_op == "join_hash") {
+        std::cerr << "join_hash time: " << duration << "s" << std::endl;
+    }
 }
 
 void test_insert(std::shared_ptr<Table> target_table, std::shared_ptr<const Table> source_table) {
@@ -88,16 +90,14 @@ void test_update(std::shared_ptr<Table>& target_table, std::shared_ptr<const Tab
     std::cerr << "update time: " << duration << "s" << std::endl;
 }
 
-void test_aggregate_hash(std::shared_ptr<Table>& target_table, const std::vector<std::string>& aggregates, const std::vector<ColumnID>& _groupby_column_ids) {
+void test_aggregate_hash(std::shared_ptr<Table>& target_table, const std::vector<std::string>& aggregates, const std::vector<ColumnID>& _groupby_column_ids, const std::string& test_op) {
     auto start = std::chrono::high_resolution_clock::now();
-    aggregate_hash(target_table, aggregates, _groupby_column_ids);
+    aggregate_hash(target_table, aggregates, _groupby_column_ids, test_op);
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration<double>(end - start).count();
-    std::cerr << "aggregate_hash time: " << duration << "s" << std::endl;
-}
-
-void test_aggregate_segment() {
-
+    if(test_op == "aggregate_hash") {
+        std::cerr << "aggregate_hash time: " << duration << "s" << std::endl;
+    }
 }
 
 void printUsage() {
@@ -203,11 +203,11 @@ int main(int argc, char** argv) {
         test_update(r_table, r_insert, reference_r_table);
         test_update(s_table, s_insert, reference_s_table);
     }
-    else if (test_op == "aggregate_hash") {
+    else if (test_op == "aggregate_hash" || test_op == "partition_by_groupby_keys" || test_op == "aggregate_segment") {
         auto tables = generate_tables(sf, output_data, "r_table.csv", "s_table.csv");
         auto r_table = tables[0];
         auto s_table = tables[1];
-        test_aggregate_hash(s_table, {}, {0});
+        test_aggregate_hash(s_table, {"sum"}, {0}, test_op);
     }
 
     return 0;

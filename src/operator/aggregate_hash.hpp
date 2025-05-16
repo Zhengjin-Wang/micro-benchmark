@@ -25,7 +25,8 @@ using KeysPerChunk = std::vector<AggregateKeys<AggregateKey>>;
 template <typename AggregateKey>
 KeysPerChunk<AggregateKey> _partition_by_groupby_keys(const std::shared_ptr<Table>& input_table,
                 const std::vector<std::string>& aggregates,
-                const std::vector<ColumnID>& _groupby_column_ids){
+                const std::vector<ColumnID>& _groupby_column_ids,
+                bool output_time){
   const auto start = std::chrono::high_resolution_clock::now();
   auto keys_per_chunk = KeysPerChunk<AggregateKey>{};
 
@@ -182,15 +183,32 @@ KeysPerChunk<AggregateKey> _partition_by_groupby_keys(const std::shared_ptr<Tabl
   }
   const auto end = std::chrono::high_resolution_clock::now();
   const auto duration = std::chrono::duration<double>(end - start).count();
-  std::cerr << "partition_by_groupby_keys time: " << duration << "s" << std::endl;
+  if(output_time) {
+    std::cerr << "partition_by_groupby_keys time: " << duration << "s" << std::endl;
+  }
   return keys_per_chunk;
 }
 
 template <typename AggregateKey>
 void _aggregate(const std::shared_ptr<Table>& input_table,
                 const std::vector<std::string>& aggregates,
-                const std::vector<ColumnID>& _groupby_column_ids){
-    auto keys_per_chunk = _partition_by_groupby_keys<AggregateKey>(input_table, aggregates, _groupby_column_ids);
+                const std::vector<ColumnID>& _groupby_column_ids,
+                const std::string& test_op){
+
+    auto output_partition_by_groupby_keys_time = false;
+    auto output_aggregate_segment_time = false;
+   if(test_op == "aggregate_hash") {
+     output_partition_by_groupby_keys_time = true;
+     output_aggregate_segment_time = true;
+   }
+    else if (test_op == "partition_by_groupby_keys") {
+      output_partition_by_groupby_keys_time = true;
+    }
+    else if (test_op == "aggregate_segment") {
+      output_aggregate_segment_time = true;
+    }
+
+    auto keys_per_chunk = _partition_by_groupby_keys<AggregateKey>(input_table, aggregates, _groupby_column_ids, output_partition_by_groupby_keys_time);
 
   const auto start = std::chrono::high_resolution_clock::now();
   auto chunk_count = input_table->chunk_count();
@@ -207,6 +225,11 @@ void _aggregate(const std::shared_ptr<Table>& input_table,
 
         // 创建聚合器
         auto aggregator = std::make_shared<SumAggregator<int, AggregateKey>>();
+        for(auto& s:aggregates) {
+          if(s == "sum") {
+            aggregator = std::make_shared<SumAggregator<int, AggregateKey>>();
+          }
+        }
         aggregate_segment<int, AggregateKey>(
               chunk_id,
               segment->values(),
@@ -220,12 +243,15 @@ void _aggregate(const std::shared_ptr<Table>& input_table,
   }
   const auto end = std::chrono::high_resolution_clock::now();
   const auto duration = std::chrono::duration<double>(end - start).count();
-  std::cerr << "aggregate_segment time: " << duration << "s" << std::endl;
+  if(output_aggregate_segment_time) {
+    std::cerr << "aggregate_segment time: " << duration << "s" << std::endl;
+  }
 }
 
 std::shared_ptr<const Table> aggregate_hash(const std::shared_ptr<Table>& input_table,
                 const std::vector<std::string>& aggregates,
-                const std::vector<ColumnID>& _groupby_column_ids) {
+                const std::vector<ColumnID>& _groupby_column_ids,
+                const std::string& test_op) {
     switch (_groupby_column_ids.size()) {
         case 0:
 //            _aggregate<EmptyAggregateKey>();
@@ -233,7 +259,7 @@ std::shared_ptr<const Table> aggregate_hash(const std::shared_ptr<Table>& input_
         case 1:
             // No need for a complex data structure if we only have one entry.
             // 默认group key为1
-            _aggregate<AggregateKeyEntry>(input_table, aggregates, _groupby_column_ids);
+            _aggregate<AggregateKeyEntry>(input_table, aggregates, _groupby_column_ids, test_op);
         break;
         case 2:
 //            _aggregate<std::array<AggregateKeyEntry, 2>>();
