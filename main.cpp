@@ -9,6 +9,7 @@
 #include "src/operator/delete.hpp"
 #include "src/operator/update.hpp"
 #include "src/operator/aggregate_hash.hpp"
+#include "src/operator/aggregate_segment.hpp"
 #include "src/storage/storage.hpp"
 #include "src/storage/segment.hpp"
 #include "src/storage/reference_segment.hpp"
@@ -93,6 +94,10 @@ void test_aggregate_hash(std::shared_ptr<Table>& target_table, const std::vector
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration<double>(end - start).count();
     std::cerr << "aggregate_hash time: " << duration << "s" << std::endl;
+}
+
+void test_aggregate_segment() {
+
 }
 
 void printUsage() {

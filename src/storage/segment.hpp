@@ -89,6 +89,7 @@ public:
     virtual void generate_random(size_t num_rows) = 0; // 随机生成数据
     virtual void resize(int32_t num_rows) = 0;
     bool is_pk() const { return _is_pk; }
+    std::vector<bool>& null_values() {return _null_values;}
 
     static std::shared_ptr<BaseSegment> create_segment(const DataType& type, bool is_pk, float range_lower_bound, float range_upper_bound, int32_t num_rows = 0);
 
