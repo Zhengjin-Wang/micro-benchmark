@@ -53,14 +53,14 @@ std::vector<std::shared_ptr<Table>> generate_tables(int sf, bool output_data, st
     return {r_table, s_table};
 }
 
-void test_join_hash(std::shared_ptr<const Table> r_table, std::shared_ptr<const Table> s_table) {
+void test_join_hash(std::shared_ptr<const Table> r_table, std::shared_ptr<const Table> s_table, const std::string& test_op) {
     // 测试join_hash
     std::pair<ColumnID, ColumnID> column_ids({0, 0});
     auto start = std::chrono::high_resolution_clock::now();
-    join_hash<int, int, int>(r_table, s_table, column_ids, 10);
+    join_hash<int, int, int>(r_table, s_table, column_ids, 10, test_op);
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration<double>(end - start).count();
-    std::cerr << "hash_join time: " << duration << "s" << std::endl;
+    // std::cerr << "join_hash time: " << duration << "s" << std::endl;
 }
 
 void test_insert(std::shared_ptr<Table> target_table, std::shared_ptr<const Table> source_table) {
@@ -160,11 +160,11 @@ int main(int argc, char** argv) {
 
 
     // 测试算子
-    if (test_op == "join_hash") {
+    if (test_op == "join_hash" || test_op == "materialize_input" || test_op == "partition_by_radix") {
         auto tables = generate_tables(sf, output_data, "r_table.csv", "s_table.csv");
         auto r_table = tables[0];
         auto s_table = tables[1];
-        test_join_hash(r_table, s_table);
+        test_join_hash(r_table, s_table, test_op);
     }
     else if (test_op == "insert") {
         auto tables = generate_tables(0, output_data, "r_table.csv", "s_table.csv");

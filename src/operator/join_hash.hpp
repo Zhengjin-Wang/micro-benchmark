@@ -47,7 +47,7 @@ template <typename T, typename HashedType>
 RadixContainer<T> materialize_input(const std::shared_ptr<const Table>& in_table, const ColumnID column_id,
                                     std::vector<std::vector<size_t>>& histograms, const size_t radix_bits,
                                     BloomFilter& output_bloom_filter,
-                                    const BloomFilter& input_bloom_filter) {
+                                    const BloomFilter& input_bloom_filter, bool output_time) {
 #ifdef BOOST_BITSET
     output_bloom_filter.resize(BLOOM_FILTER_SIZE);
 #endif
@@ -135,7 +135,10 @@ RadixContainer<T> materialize_input(const std::shared_ptr<const Table>& in_table
 
     const auto end = std::chrono::high_resolution_clock::now();
     const auto duration = std::chrono::duration<double>(end - start).count();
-    std::cerr << "materialize_input time: " << duration << "s" << std::endl;
+    if (output_time)
+    {
+        std::cerr << "materialize_input time: " << duration << "s" << std::endl;
+    }
 
     return radix_container;
 
@@ -144,7 +147,7 @@ RadixContainer<T> materialize_input(const std::shared_ptr<const Table>& in_table
 template <typename T, typename HashedType, bool keep_null_values>
 RadixContainer<T> partition_by_radix(const RadixContainer<T>& radix_container,
                                      std::vector<std::vector<size_t>>& histograms, const size_t radix_bits,
-                                     const BloomFilter& input_bloom_filter = ALL_TRUE_BLOOM_FILTER) {
+                                     const BloomFilter& input_bloom_filter = ALL_TRUE_BLOOM_FILTER, bool output_time = false) {
 
     if (radix_container.empty()) {
     return radix_container;
@@ -239,14 +242,17 @@ RadixContainer<T> partition_by_radix(const RadixContainer<T>& radix_container,
   }
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration<double>(end - start).count();
-    std::cerr << "partition_by_radix time: " << duration << "s" << std::endl;
+    if (output_time)
+    {
+        std::cerr << "partition_by_radix time: " << duration << "s" << std::endl;
+    }
   return output;
 }
 
 // keep nulls is false
 template <typename BuildColumnType, typename ProbeColumnType, typename HashedType>
 void join_hash(std::shared_ptr<const Table> build_input_table, std::shared_ptr<const Table> probe_input_table,
-               std::pair<ColumnID, ColumnID>& column_ids, const size_t radix_bits) {
+               std::pair<ColumnID, ColumnID>& column_ids, const size_t radix_bits, const std::string& test_op) {
 
     auto keep_nulls_build_column = false;
     auto keep_nulls_probe_column = false;
@@ -263,16 +269,32 @@ void join_hash(std::shared_ptr<const Table> build_input_table, std::shared_ptr<c
     auto build_side_bloom_filter = BloomFilter{};
     auto probe_side_bloom_filter = BloomFilter{};
 
+    auto output_materialize_input_time = false;
+    auto output_partition_by_radix_time = false;
+    if (test_op == "join_hash")
+    {
+        output_materialize_input_time = true;
+        output_partition_by_radix_time = true;
+    }
+    else if (test_op == "materialize_input")
+    {
+        output_materialize_input_time = true;
+    }
+    else if (test_op == "partition_by_radix")
+    {
+        output_partition_by_radix_time = true;
+    }
+
     const auto materialize_build_side = [&](const auto& input_bloom_filter) {
             materialized_build_column = materialize_input<BuildColumnType, HashedType>(
                 build_input_table, column_ids.first, histograms_build_column, radix_bits, build_side_bloom_filter,
-                input_bloom_filter);
+                input_bloom_filter, output_materialize_input_time);
     };
 
     const auto materialize_probe_side = [&](const auto& input_bloom_filter) {
             materialized_probe_column = materialize_input<ProbeColumnType, HashedType>(
                 probe_input_table, column_ids.second, histograms_probe_column, radix_bits, probe_side_bloom_filter,
-                input_bloom_filter);
+                input_bloom_filter, output_materialize_input_time);
     };
 
     if (build_input_table->row_count() < probe_input_table->row_count()) {
@@ -296,10 +318,10 @@ void join_hash(std::shared_ptr<const Table> build_input_table, std::shared_ptr<c
           // radix partition the build table
           if (keep_nulls_build_column) {
             radix_build_column = partition_by_radix<BuildColumnType, HashedType, true>(
-                materialized_build_column, histograms_build_column, radix_bits);
+                materialized_build_column, histograms_build_column, radix_bits, ALL_TRUE_BLOOM_FILTER, output_partition_by_radix_time);
           } else {
             radix_build_column = partition_by_radix<BuildColumnType, HashedType, false>(
-                materialized_build_column, histograms_build_column, radix_bits);
+                materialized_build_column, histograms_build_column, radix_bits, ALL_TRUE_BLOOM_FILTER, output_partition_by_radix_time);
           }
 
           // After the data in materialized_build_column has been partitioned, it is not needed anymore.
@@ -310,10 +332,10 @@ void join_hash(std::shared_ptr<const Table> build_input_table, std::shared_ptr<c
           // radix partition the probe column.
           if (keep_nulls_probe_column) {
             radix_probe_column = partition_by_radix<ProbeColumnType, HashedType, true>(
-                materialized_probe_column, histograms_probe_column, radix_bits);
+                materialized_probe_column, histograms_probe_column, radix_bits, ALL_TRUE_BLOOM_FILTER, output_partition_by_radix_time);
           } else {
             radix_probe_column = partition_by_radix<ProbeColumnType, HashedType, false>(
-                materialized_probe_column, histograms_probe_column, radix_bits);
+                materialized_probe_column, histograms_probe_column, radix_bits, ALL_TRUE_BLOOM_FILTER, output_partition_by_radix_time);
           }
 
           // After the data in materialized_probe_column has been partitioned, it is not needed anymore.
