@@ -193,6 +193,7 @@ template <typename AggregateKey>
 void _aggregate(const std::shared_ptr<Table>& input_table,
                 const std::vector<std::string>& aggregates,
                 const std::vector<ColumnID>& _groupby_column_ids,
+                const std::vector<ColumnID>& _aggregate_column_ids,
                 const std::string& test_op){
 
     auto output_partition_by_groupby_keys_time = false;
@@ -215,7 +216,7 @@ void _aggregate(const std::shared_ptr<Table>& input_table,
   for(auto chunk_id = ChunkID{0}; chunk_id < chunk_count; ++chunk_id) {
     auto chunk = input_table->get_chunk(chunk_id);
     auto column_count = chunk->column_count();
-    for (auto column_id = ColumnID{0}; column_id < column_count; ++column_id) {
+    for (auto column_id : _aggregate_column_ids) {
       auto base_segment = chunk->get_segment(column_id);
       auto& type = chunk->column_defs()[column_id].type;
       if(std::holds_alternative<int>(type)) {
@@ -251,6 +252,7 @@ void _aggregate(const std::shared_ptr<Table>& input_table,
 std::shared_ptr<const Table> aggregate_hash(const std::shared_ptr<Table>& input_table,
                 const std::vector<std::string>& aggregates,
                 const std::vector<ColumnID>& _groupby_column_ids,
+                const std::vector<ColumnID>& _aggregate_column_ids,
                 const std::string& test_op) {
     switch (_groupby_column_ids.size()) {
         case 0:
@@ -259,7 +261,7 @@ std::shared_ptr<const Table> aggregate_hash(const std::shared_ptr<Table>& input_
         case 1:
             // No need for a complex data structure if we only have one entry.
             // 默认group key为1
-            _aggregate<AggregateKeyEntry>(input_table, aggregates, _groupby_column_ids, test_op);
+            _aggregate<AggregateKeyEntry>(input_table, aggregates, _groupby_column_ids, _aggregate_column_ids, test_op);
         break;
         case 2:
 //            _aggregate<std::array<AggregateKeyEntry, 2>>();

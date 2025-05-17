@@ -14,7 +14,7 @@
 #include "src/storage/segment.hpp"
 #include "src/storage/reference_segment.hpp"
 
-std::vector<std::shared_ptr<Table>> generate_tables(int sf, bool output_data, std::string r_table_filepath, std::string s_table_filepath) {
+std::vector<std::shared_ptr<Table>> generate_tables(int sf, bool output_data, std::string r_table_filepath, std::string s_table_filepath, const std::vector<ColumnID>& column_ids = {0}) {
     // std::cout << "sf=" << sf << std::endl;
     size_t m = 159526 * sf; // r_table_size
     size_t n = 6001215 * sf; // s_table_size
@@ -28,7 +28,6 @@ std::vector<std::shared_ptr<Table>> generate_tables(int sf, bool output_data, st
         // {int{}, false, 1, 100},
         // {std::string{}, false, 0, 0}
     };
-    const auto r_table = std::make_shared<Table>(r_column_defs);
 
     std::vector<ColumnDefinition> s_column_defs = {
         {int{}, false, (float) pk_lower_bound, (float) pk_upper_bound},
@@ -38,6 +37,12 @@ std::vector<std::shared_ptr<Table>> generate_tables(int sf, bool output_data, st
         // {float{}, false, 0.01, 0.10},
         // {int{}, false, 1, 7}
     };
+    for(int i = 1; i < column_ids.size(); i++) {
+        r_column_defs.emplace_back(ColumnDefinition{int{}, false, 1, 100});
+        s_column_defs.emplace_back(ColumnDefinition{int{}, false, 1, 50});
+    }
+
+    const auto r_table = std::make_shared<Table>(r_column_defs);
     const auto s_table = std::make_shared<Table>(s_column_defs);
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -47,8 +52,8 @@ std::vector<std::shared_ptr<Table>> generate_tables(int sf, bool output_data, st
     auto duration = std::chrono::duration<double>(end - start).count();
     std::cerr << "Generate data time: " << duration << "s" << std::endl;
     if (output_data){
-        r_table->output_data(r_table_filepath, {0});
-        s_table->output_data(s_table_filepath, {0});
+        r_table->output_data(r_table_filepath, column_ids);
+        s_table->output_data(s_table_filepath, column_ids);
     }
 
     return {r_table, s_table};
@@ -90,9 +95,9 @@ void test_update(std::shared_ptr<Table>& target_table, std::shared_ptr<const Tab
     std::cerr << "update time: " << duration << "s" << std::endl;
 }
 
-void test_aggregate_hash(std::shared_ptr<Table>& target_table, const std::vector<std::string>& aggregates, const std::vector<ColumnID>& _groupby_column_ids, const std::string& test_op) {
+void test_aggregate_hash(std::shared_ptr<Table>& target_table, const std::vector<std::string>& aggregates, const std::vector<ColumnID>& _groupby_column_ids,  const std::vector<ColumnID>& _aggregate_column_ids, const std::string& test_op) {
     auto start = std::chrono::high_resolution_clock::now();
-    aggregate_hash(target_table, aggregates, _groupby_column_ids, test_op);
+    aggregate_hash(target_table, aggregates, _groupby_column_ids, _aggregate_column_ids, test_op);
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration<double>(end - start).count();
     if(test_op == "aggregate_hash") {
@@ -204,10 +209,10 @@ int main(int argc, char** argv) {
         test_update(s_table, s_insert, reference_s_table);
     }
     else if (test_op == "aggregate_hash" || test_op == "partition_by_groupby_keys" || test_op == "aggregate_segment") {
-        auto tables = generate_tables(sf, output_data, "r_table.csv", "s_table.csv");
+        auto tables = generate_tables(sf, output_data, "r_table_agg.csv", "s_table_agg.csv", {0, 1});
         auto r_table = tables[0];
         auto s_table = tables[1];
-        test_aggregate_hash(s_table, {"sum"}, {0}, test_op);
+        test_aggregate_hash(s_table, {"sum"}, {0}, {1}, test_op);
     }
 
     return 0;
