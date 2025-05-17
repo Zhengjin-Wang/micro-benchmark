@@ -215,7 +215,7 @@ void _aggregate(const std::shared_ptr<Table>& input_table,
   for(auto chunk_id = ChunkID{0}; chunk_id < chunk_count; ++chunk_id) {
     auto chunk = input_table->get_chunk(chunk_id);
     auto column_count = chunk->column_count();
-    for (auto column_id = ColumnID{0}; chunk_id < column_count; ++chunk_id) {
+    for (auto column_id = ColumnID{0}; column_id < column_count; ++column_id) {
       auto base_segment = chunk->get_segment(column_id);
       auto& type = chunk->column_defs()[column_id].type;
       if(std::holds_alternative<int>(type)) {

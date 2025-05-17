@@ -110,32 +110,5 @@ void aggregate_segment(
     }
 }
 
-// // 使用示例
-// void example_usage() {
-//     // 定义数据类型
-//     using ColumnType = int;
-//     using AggregateType = int;
-//
-//     // 准备数据
-//     std::vector<ColumnType> data = {1, 2, 3, 4, 5};
-//     std::vector<bool> null_flags = {false, false, false, false, false};
-//     std::vector<size_t> keys = {1, 1, 2, 2, 2};  // 分组键
-//
-//     // 创建上下文
-//     auto context = std::make_shared<AggregateContext<AggregateType>>();
-//
-//     // 创建聚合器
-//     auto aggregator = std::make_shared<SumAggregator<ColumnType, AggregateType>>();
-//
-//     // 执行聚合
-//     aggregate_segment<ColumnType, AggregateType>(
-//         ChunkID{0},
-//         data,
-//         null_flags,
-//         keys,
-//         context,
-//         aggregator
-//     );
-// }
 
 #endif //AGGREGATE_SEGMENT_HPP
