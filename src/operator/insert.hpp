@@ -187,7 +187,7 @@ std::shared_ptr<const Table> insert(std::shared_ptr<Table> _target_table, std::s
     }
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration<double>(end - start).count();
-    std::cerr << "insert stage1 time: " << duration << "s" << std::endl;
+    // std::cerr << "insert stage1 time: " << duration << "s" << std::endl;
   } // stage 1 end
 
     /**
@@ -233,7 +233,7 @@ std::shared_ptr<const Table> insert(std::shared_ptr<Table> _target_table, std::s
   }
   auto end = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration<double>(end - start).count();
-  std::cerr << "insert stage2 time: " << duration << "s" << std::endl;
+  // std::cerr << "insert stage2 time: " << duration << "s" << std::endl;
 
   return _target_table;
 }

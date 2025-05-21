@@ -314,7 +314,7 @@ void join_hash(std::shared_ptr<const Table> build_input_table, std::shared_ptr<c
     if (radix_bits > 0) {
         std::vector<std::future<void>> jobs;
 
-        jobs.emplace_back(std::async(std::launch::async,[&]() {
+        jobs.emplace_back(std::async(std::launch::deferred,[&]() {
           // radix partition the build table
           if (keep_nulls_build_column) {
             radix_build_column = partition_by_radix<BuildColumnType, HashedType, true>(
@@ -328,7 +328,7 @@ void join_hash(std::shared_ptr<const Table> build_input_table, std::shared_ptr<c
           materialized_build_column.clear();
         }));
 
-        jobs.emplace_back(std::async(std::launch::async,[&]() {
+        jobs.emplace_back(std::async(std::launch::deferred,[&]() {
           // radix partition the probe column.
           if (keep_nulls_probe_column) {
             radix_probe_column = partition_by_radix<ProbeColumnType, HashedType, true>(

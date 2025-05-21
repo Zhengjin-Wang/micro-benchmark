@@ -16,8 +16,10 @@
 
 std::vector<std::shared_ptr<Table>> generate_tables(int sf, bool output_data, std::string r_table_filepath, std::string s_table_filepath, const std::vector<ColumnID>& column_ids = {0}) {
     // std::cout << "sf=" << sf << std::endl;
-    size_t m = 159526 * sf; // r_table_size
-    size_t n = 6001215 * sf; // s_table_size
+    // size_t m = 159526 * sf; // r_table_size
+    // size_t n = 6001215 * sf; // s_table_size
+    size_t m = 15 * sf; // r_table_size
+    size_t n = 600 * sf; // s_table_size
     size_t pk_lower_bound = 1;
     size_t pk_upper_bound = 200000 * sf;
 
@@ -67,7 +69,7 @@ void test_join_hash(std::shared_ptr<const Table> r_table, std::shared_ptr<const 
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration<double>(end - start).count();
     if(test_op == "join_hash") {
-        std::cerr << "join_hash time: " << duration << "s" << std::endl;
+        // std::cerr << "join_hash time: " << duration << "s" << std::endl;
     }
 }
 
@@ -101,7 +103,7 @@ void test_aggregate_hash(std::shared_ptr<Table>& target_table, const std::vector
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration<double>(end - start).count();
     if(test_op == "aggregate_hash") {
-        std::cerr << "aggregate_hash time: " << duration << "s" << std::endl;
+        // std::cerr << "aggregate_hash time: " << duration << "s" << std::endl;
     }
 }
 
@@ -164,10 +166,7 @@ int main(int argc, char** argv) {
         std::cout << "Extra argument: " << argv[i] << "\n";
     }
 
-    std::cout << "sf=" << sf << ", output_data=" << output_data<< ", test_op=" << test_op<<std::endl;
-
-    // 生成表
-
+    std::cerr << "sf=" << sf << ", output_data=" << output_data<< ", test_op=" << test_op<<std::endl;
 
     // 测试算子
     if (test_op == "join_hash" || test_op == "materialize_input" || test_op == "partition_by_radix") {
@@ -213,6 +212,22 @@ int main(int argc, char** argv) {
         auto r_table = tables[0];
         auto s_table = tables[1];
         test_aggregate_hash(s_table, {"sum"}, {0}, {1}, test_op);
+    }
+    else if (test_op == "all_in_one") {
+        auto tables = generate_tables(sf, output_data, "r_table.csv", "s_table.csv");
+        auto r_table = tables[0];
+        auto s_table = tables[1];
+        auto tables_agg = generate_tables(sf, output_data, "r_table.csv", "s_table.csv", {0,1});
+        auto s_agg_table = tables_agg[1];
+        auto insert_tables = generate_tables(sf, output_data, "r_table_insert.csv", "s_table_insert.csv");
+        std::shared_ptr<const Table> s_insert = insert_tables[1];
+        auto reference_s_table = ReferenceSegment::create_reference_table(s_table);
+
+        test_join_hash(r_table, s_table, "join_hash");
+        test_aggregate_hash(s_agg_table, {"sum"}, {0}, {1}, "aggregate_hash");
+        test_update(s_table, s_insert, reference_s_table);
+        test_delete(reference_s_table);
+        test_insert(s_table, s_insert);
     }
 
     return 0;
