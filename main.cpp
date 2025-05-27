@@ -14,12 +14,12 @@
 #include "src/storage/segment.hpp"
 #include "src/storage/reference_segment.hpp"
 
-std::vector<std::shared_ptr<Table>> generate_tables(int sf, bool output_data, std::string r_table_filepath, std::string s_table_filepath, const std::vector<ColumnID>& column_ids = {0}) {
+std::vector<std::shared_ptr<Table>> generate_tables(float sf, bool output_data, std::string r_table_filepath, std::string s_table_filepath, const std::vector<ColumnID>& column_ids = {0}) {
     // std::cout << "sf=" << sf << std::endl;
-    // size_t m = 159526 * sf; // r_table_size
-    // size_t n = 6001215 * sf; // s_table_size
-    size_t m = 15 * sf; // r_table_size
-    size_t n = 600 * sf; // s_table_size
+    size_t m = 159526 * sf; // r_table_size
+    size_t n = 6001215 * sf; // s_table_size
+    // size_t m = 15 * sf; // r_table_size
+    // size_t n = 600 * sf; // s_table_size
     size_t pk_lower_bound = 1;
     size_t pk_upper_bound = 200000 * sf;
 
@@ -128,7 +128,7 @@ int main(int argc, char** argv) {
         {nullptr, 0, nullptr, 0} // 结束标志
     };
 
-    int sf = 1;
+    float sf = 1.0;
     bool output_data = false;
     std::string test_op = "";
 
@@ -145,7 +145,7 @@ int main(int argc, char** argv) {
                 printUsage();
             return 0;
             case 's':
-                sf = atoi(optarg);
+                sf = atof(optarg);
             break;
             case 'o':
                 output_data = true;

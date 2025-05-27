@@ -211,42 +211,42 @@ void _aggregate(const std::shared_ptr<Table>& input_table,
 
     auto keys_per_chunk = _partition_by_groupby_keys<AggregateKey>(input_table, aggregates, _groupby_column_ids, output_partition_by_groupby_keys_time);
 
-  const auto start = std::chrono::high_resolution_clock::now();
-  auto chunk_count = input_table->chunk_count();
-  for(auto chunk_id = ChunkID{0}; chunk_id < chunk_count; ++chunk_id) {
-    auto chunk = input_table->get_chunk(chunk_id);
-    auto column_count = chunk->column_count();
-    for (auto column_id : _aggregate_column_ids) {
-      auto base_segment = chunk->get_segment(column_id);
-      auto& type = chunk->column_defs()[column_id].type;
-      if(std::holds_alternative<int>(type)) {
-        auto segment = std::dynamic_pointer_cast<IntSegment>(base_segment);
-        // 创建上下文
-        auto context = std::make_shared<AggregateContext<AggregateKey>>();
-
-        // 创建聚合器
-        auto aggregator = std::make_shared<SumAggregator<int, AggregateKey>>();
-        for(auto& s:aggregates) {
-          if(s == "sum") {
-            aggregator = std::make_shared<SumAggregator<int, AggregateKey>>();
-          }
-        }
-        aggregate_segment<int, AggregateKey>(
-              chunk_id,
-              segment->values(),
-              segment->null_values(),
-              keys_per_chunk[chunk_id],
-              context,
-              aggregator
-          );
-      }
-    }
-  }
-  const auto end = std::chrono::high_resolution_clock::now();
-  const auto duration = std::chrono::duration<double>(end - start).count();
-  if(output_aggregate_segment_time) {
-    std::cerr << "aggregate_segment time: " << duration << "s" << std::endl;
-  }
+  // const auto start = std::chrono::high_resolution_clock::now();
+  // auto chunk_count = input_table->chunk_count();
+  // for(auto chunk_id = ChunkID{0}; chunk_id < chunk_count; ++chunk_id) {
+  //   auto chunk = input_table->get_chunk(chunk_id);
+  //   auto column_count = chunk->column_count();
+  //   for (auto column_id : _aggregate_column_ids) {
+  //     auto base_segment = chunk->get_segment(column_id);
+  //     auto& type = chunk->column_defs()[column_id].type;
+  //     if(std::holds_alternative<int>(type)) {
+  //       auto segment = std::dynamic_pointer_cast<IntSegment>(base_segment);
+  //       // 创建上下文
+  //       auto context = std::make_shared<AggregateContext<AggregateKey>>();
+  //
+  //       // 创建聚合器
+  //       auto aggregator = std::make_shared<SumAggregator<int, AggregateKey>>();
+  //       for(auto& s:aggregates) {
+  //         if(s == "sum") {
+  //           aggregator = std::make_shared<SumAggregator<int, AggregateKey>>();
+  //         }
+  //       }
+  //       aggregate_segment<int, AggregateKey>(
+  //             chunk_id,
+  //             segment->values(),
+  //             segment->null_values(),
+  //             keys_per_chunk[chunk_id],
+  //             context,
+  //             aggregator
+  //         );
+  //     }
+  //   }
+  // }
+  // const auto end = std::chrono::high_resolution_clock::now();
+  // const auto duration = std::chrono::duration<double>(end - start).count();
+  // if(output_aggregate_segment_time) {
+  //   std::cerr << "aggregate_segment time: " << duration << "s" << std::endl;
+  // }
 }
 
 std::shared_ptr<const Table> aggregate_hash(const std::shared_ptr<Table>& input_table,
