@@ -1,0 +1,20 @@
+cmake_minimum_required(VERSION 3.10)
+project(micro_bench)
+
+# 设置 C++ 标准
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
+set(BUILD_SHARED_LIBS OFF)
+# 添加可执行文件
+add_executable(micro_bench main.cpp
+        src/types.hpp
+        src/storage/mvcc_data.cpp
+        src/storage/mvcc_data.hpp
+        src/operator/aggregate_segment.hpp)
+# 显式链接静态 pthread 库
+target_link_libraries(micro_bench PRIVATE
+    /usr/lib/aarch64-linux-gnu/libpthread.a
+    -static-libstdc++
+    -static-libgcc
+)
+set_target_properties(micro_bench PROPERTIES LINK_FLAGS "-static -Wl,--whole-archive -lpthread -Wl,--no-whole-archive")
