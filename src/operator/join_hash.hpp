@@ -47,7 +47,7 @@ template <typename T, typename HashedType>
 RadixContainer<T> materialize_input(const std::shared_ptr<const Table>& in_table, const ColumnID column_id,
                                     std::vector<std::vector<size_t>>& histograms, const size_t radix_bits,
                                     BloomFilter& output_bloom_filter,
-                                    const BloomFilter& input_bloom_filter, bool output_time) {
+                                    const BloomFilter& input_bloom_filter, bool output_time, std::launch& policy) {
 #ifdef BOOST_BITSET
     output_bloom_filter.resize(BLOOM_FILTER_SIZE);
 #endif
@@ -116,7 +116,7 @@ RadixContainer<T> materialize_input(const std::shared_ptr<const Table>& in_table
     // copy memory
     std::vector<std::future<void>> futures;
     for (uint32_t chunk_id = 0; chunk_id < chunk_count; ++chunk_id){
-        futures.emplace_back(std::async(std::launch::async, materialize, chunk_id));
+        futures.emplace_back(std::async(policy, materialize, chunk_id));
     }
 
     // 等待所有线程完成
@@ -147,7 +147,7 @@ RadixContainer<T> materialize_input(const std::shared_ptr<const Table>& in_table
 template <typename T, typename HashedType, bool keep_null_values>
 RadixContainer<T> partition_by_radix(const RadixContainer<T>& radix_container,
                                      std::vector<std::vector<size_t>>& histograms, const size_t radix_bits,
-                                     const BloomFilter& input_bloom_filter = ALL_TRUE_BLOOM_FILTER, bool output_time = false) {
+                                     const BloomFilter& input_bloom_filter, bool output_time, std::launch& policy) {
 
     if (radix_container.empty()) {
     return radix_container;
@@ -217,7 +217,7 @@ RadixContainer<T> partition_by_radix(const RadixContainer<T>& radix_container,
     if (JOB_SPAWN_THRESHOLD > elements_count) {
       perform_partition();
     } else {
-      jobs.emplace_back(std::async(std::launch::async, perform_partition));
+      jobs.emplace_back(std::async(policy, perform_partition));
     }
   }
     for (auto& future : jobs) {
@@ -228,7 +228,7 @@ RadixContainer<T> partition_by_radix(const RadixContainer<T>& radix_container,
   // Compress null_values_as_char into partition.null_values
   if constexpr (keep_null_values) {
     for (auto output_partition_idx = size_t{0}; output_partition_idx < output_partition_count; ++output_partition_idx) {
-      jobs.emplace_back(std::async(std::launch::async, [&, output_partition_idx]() {
+      jobs.emplace_back(std::async(policy, [&, output_partition_idx]() {
         const auto null_value_count = output[output_partition_idx].null_values.size();
         for (auto element_idx = size_t{0}; element_idx < null_value_count; ++element_idx) {
           output[output_partition_idx].null_values[element_idx] =
@@ -252,7 +252,7 @@ RadixContainer<T> partition_by_radix(const RadixContainer<T>& radix_container,
 // keep nulls is false
 template <typename BuildColumnType, typename ProbeColumnType, typename HashedType>
 void join_hash(std::shared_ptr<const Table> build_input_table, std::shared_ptr<const Table> probe_input_table,
-               std::pair<ColumnID, ColumnID>& column_ids, const size_t radix_bits, const std::string& test_op) {
+               std::pair<ColumnID, ColumnID>& column_ids, const size_t radix_bits, const std::string& test_op, std::launch& policy) {
 
     auto keep_nulls_build_column = false;
     auto keep_nulls_probe_column = false;
@@ -288,13 +288,13 @@ void join_hash(std::shared_ptr<const Table> build_input_table, std::shared_ptr<c
     const auto materialize_build_side = [&](const auto& input_bloom_filter) {
             materialized_build_column = materialize_input<BuildColumnType, HashedType>(
                 build_input_table, column_ids.first, histograms_build_column, radix_bits, build_side_bloom_filter,
-                input_bloom_filter, output_materialize_input_time);
+                input_bloom_filter, output_materialize_input_time, policy);
     };
 
     const auto materialize_probe_side = [&](const auto& input_bloom_filter) {
             materialized_probe_column = materialize_input<ProbeColumnType, HashedType>(
                 probe_input_table, column_ids.second, histograms_probe_column, radix_bits, probe_side_bloom_filter,
-                input_bloom_filter, output_materialize_input_time);
+                input_bloom_filter, output_materialize_input_time, policy);
     };
 
     if (build_input_table->row_count() < probe_input_table->row_count()) {
@@ -314,28 +314,28 @@ void join_hash(std::shared_ptr<const Table> build_input_table, std::shared_ptr<c
     if (radix_bits > 0) {
         std::vector<std::future<void>> jobs;
 
-        jobs.emplace_back(std::async(std::launch::deferred,[&]() {
+        jobs.emplace_back(std::async(policy,[&]() {
           // radix partition the build table
           if (keep_nulls_build_column) {
             radix_build_column = partition_by_radix<BuildColumnType, HashedType, true>(
-                materialized_build_column, histograms_build_column, radix_bits, ALL_TRUE_BLOOM_FILTER, output_partition_by_radix_time);
+                materialized_build_column, histograms_build_column, radix_bits, ALL_TRUE_BLOOM_FILTER, output_partition_by_radix_time, policy);
           } else {
             radix_build_column = partition_by_radix<BuildColumnType, HashedType, false>(
-                materialized_build_column, histograms_build_column, radix_bits, ALL_TRUE_BLOOM_FILTER, output_partition_by_radix_time);
+                materialized_build_column, histograms_build_column, radix_bits, ALL_TRUE_BLOOM_FILTER, output_partition_by_radix_time, policy);
           }
 
           // After the data in materialized_build_column has been partitioned, it is not needed anymore.
           materialized_build_column.clear();
         }));
 
-        jobs.emplace_back(std::async(std::launch::deferred,[&]() {
+        jobs.emplace_back(std::async(policy,[&]() {
           // radix partition the probe column.
           if (keep_nulls_probe_column) {
             radix_probe_column = partition_by_radix<ProbeColumnType, HashedType, true>(
-                materialized_probe_column, histograms_probe_column, radix_bits, ALL_TRUE_BLOOM_FILTER, output_partition_by_radix_time);
+                materialized_probe_column, histograms_probe_column, radix_bits, ALL_TRUE_BLOOM_FILTER, output_partition_by_radix_time, policy);
           } else {
             radix_probe_column = partition_by_radix<ProbeColumnType, HashedType, false>(
-                materialized_probe_column, histograms_probe_column, radix_bits, ALL_TRUE_BLOOM_FILTER, output_partition_by_radix_time);
+                materialized_probe_column, histograms_probe_column, radix_bits, ALL_TRUE_BLOOM_FILTER, output_partition_by_radix_time, policy);
           }
 
           // After the data in materialized_probe_column has been partitioned, it is not needed anymore.

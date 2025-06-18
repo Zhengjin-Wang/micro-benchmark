@@ -9,7 +9,6 @@
 #include "src/operator/delete.hpp"
 #include "src/operator/update.hpp"
 #include "src/operator/aggregate_hash.hpp"
-#include "src/operator/aggregate_segment.hpp"
 #include "src/storage/storage.hpp"
 #include "src/storage/segment.hpp"
 #include "src/storage/reference_segment.hpp"
@@ -61,11 +60,11 @@ std::vector<std::shared_ptr<Table>> generate_tables(float sf, bool output_data, 
     return {r_table, s_table};
 }
 
-void test_join_hash(std::shared_ptr<const Table> r_table, std::shared_ptr<const Table> s_table, const std::string& test_op) {
+void test_join_hash(std::shared_ptr<const Table> r_table, std::shared_ptr<const Table> s_table, const std::string& test_op, std::launch& policy) {
     // 测试join_hash
     std::pair<ColumnID, ColumnID> column_ids({0, 0});
     auto start = std::chrono::high_resolution_clock::now();
-    join_hash<int, int, int>(r_table, s_table, column_ids, 1, test_op);
+    join_hash<int, int, int>(r_table, s_table, column_ids, 1, test_op, policy);
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration<double>(end - start).count();
     if(test_op == "join_hash") {
@@ -97,9 +96,9 @@ void test_update(std::shared_ptr<Table>& target_table, std::shared_ptr<const Tab
     std::cerr << "update time: " << duration << "s" << std::endl;
 }
 
-void test_aggregate_hash(std::shared_ptr<Table>& target_table, const std::vector<std::string>& aggregates, const std::vector<ColumnID>& _groupby_column_ids,  const std::vector<ColumnID>& _aggregate_column_ids, const std::string& test_op) {
+void test_aggregate_hash(std::shared_ptr<Table>& target_table, const std::vector<std::string>& aggregates, const std::vector<ColumnID>& _groupby_column_ids,  const std::vector<ColumnID>& _aggregate_column_ids, const std::string& test_op, std::launch& policy) {
     auto start = std::chrono::high_resolution_clock::now();
-    aggregate_hash(target_table, aggregates, _groupby_column_ids, _aggregate_column_ids, test_op);
+    aggregate_hash(target_table, aggregates, _groupby_column_ids, _aggregate_column_ids, test_op, policy);
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration<double>(end - start).count();
     if(test_op == "aggregate_hash") {
@@ -110,27 +109,30 @@ void test_aggregate_hash(std::shared_ptr<Table>& target_table, const std::vector
 void printUsage() {
     std::cout << "Usage: program [OPTIONS]\n"
               << "Options:\n"
-              << "  -h, --help          Show this help message\n"
-              << "  -s, --sf       set sf(default: 1)\n"
-              << "  -o, --output       if output\n"
-              << "  -t, --test       which op to test(join_hash|insert)\n";
+              << "  -h, --help               Show this help message\n"
+              << "  -s, --sf                 set sf(default: 1)\n"
+              << "  -o, --output             if output\n"
+              << "  -t, --test               which op to test(join_hash|insert)\n"
+              << "  -m, --multi-thread       multi-thread on (default: off)\n";
 }
 
 int main(int argc, char** argv) {
 
     int opt;
-    const char *optString = "h?s:ot:"; // 短选项
+    const char *optString = "h?s:ot:m"; // 短选项
     struct option longOpts[] = { // 长选项
         {"help", no_argument, nullptr, 'h'},
         {"sf", required_argument, nullptr, 's'},
         {"output", no_argument, nullptr, 'o'},
         {"test_op", required_argument, nullptr, 't'},
+        {"multi-thread", no_argument, nullptr, 'm'},
         {nullptr, 0, nullptr, 0} // 结束标志
     };
 
     float sf = 1.0;
     bool output_data = false;
     std::string test_op = "";
+    std::launch policy = std::launch::deferred;
 
     while (true) {
         int optionIndex = 0;
@@ -153,6 +155,9 @@ int main(int argc, char** argv) {
             case 't':
                 test_op = std::move(std::string(optarg));
             break;
+        case 'm':
+                policy = std::launch::async;
+            break;
             case '?':
                 printUsage();
             return 1;
@@ -173,7 +178,7 @@ int main(int argc, char** argv) {
         auto tables = generate_tables(sf, output_data, "r_table.csv", "s_table.csv");
         auto r_table = tables[0];
         auto s_table = tables[1];
-        test_join_hash(r_table, s_table, test_op);
+        test_join_hash(r_table, s_table, test_op, policy);
     }
     else if (test_op == "insert") {
         auto tables = generate_tables(0, output_data, "r_table.csv", "s_table.csv");
@@ -211,7 +216,7 @@ int main(int argc, char** argv) {
         auto tables = generate_tables(sf, output_data, "r_table_agg.csv", "s_table_agg.csv", {0, 1});
         auto r_table = tables[0];
         auto s_table = tables[1];
-        test_aggregate_hash(s_table, {"sum"}, {0}, {1}, test_op);
+        test_aggregate_hash(s_table, {"sum"}, {0}, {1}, test_op, policy);
     }
     else if (test_op == "all_in_one") {
         auto tables = generate_tables(sf, output_data, "r_table.csv", "s_table.csv");
@@ -226,8 +231,8 @@ int main(int argc, char** argv) {
         auto s_del_table = tables_del[1];
         auto delete_s_table = ReferenceSegment::create_reference_table(s_del_table);
 
-        test_join_hash(r_table, s_table, "join_hash");
-        test_aggregate_hash(s_agg_table, {"sum"}, {0}, {1}, "aggregate_hash");
+        test_join_hash(r_table, s_table, "join_hash", policy);
+        test_aggregate_hash(s_agg_table, {"sum"}, {0}, {1}, "aggregate_hash", policy);
         test_update(s_table, s_insert, reference_s_table);
         test_delete(delete_s_table);
         test_insert(s_table, s_insert);
