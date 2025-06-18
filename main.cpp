@@ -65,7 +65,7 @@ void test_join_hash(std::shared_ptr<const Table> r_table, std::shared_ptr<const 
     // 测试join_hash
     std::pair<ColumnID, ColumnID> column_ids({0, 0});
     auto start = std::chrono::high_resolution_clock::now();
-    join_hash<int, int, int>(r_table, s_table, column_ids, 10, test_op);
+    join_hash<int, int, int>(r_table, s_table, column_ids, 1, test_op);
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration<double>(end - start).count();
     if(test_op == "join_hash") {
