@@ -222,11 +222,14 @@ int main(int argc, char** argv) {
         auto insert_tables = generate_tables(sf, output_data, "r_table_insert.csv", "s_table_insert.csv");
         std::shared_ptr<const Table> s_insert = insert_tables[1];
         auto reference_s_table = ReferenceSegment::create_reference_table(s_table);
+        auto tables_del = generate_tables(sf, output_data, "r_table.csv", "s_table.csv");
+        auto s_del_table = tables_del[1];
+        auto delete_s_table = ReferenceSegment::create_reference_table(s_del_table);
 
         test_join_hash(r_table, s_table, "join_hash");
         test_aggregate_hash(s_agg_table, {"sum"}, {0}, {1}, "aggregate_hash");
         test_update(s_table, s_insert, reference_s_table);
-        test_delete(reference_s_table);
+        test_delete(delete_s_table);
         test_insert(s_table, s_insert);
     }
 
