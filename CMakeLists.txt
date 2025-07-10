@@ -8,3 +8,5 @@ add_executable(micro_bench main.cpp
         src/storage/mvcc_data.cpp
         src/storage/mvcc_data.hpp
         src/operator/aggregate_segment.hpp)
+
+target_link_libraries(micro_bench pthread)
